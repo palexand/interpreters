@@ -1,0 +1,735 @@
+\documentclass[10pt]{article}
+
+\usepackage{url}
+\usepackage{proof}
+\usepackage{fullpage}
+
+%% ODER: format ==         = "\mathrel{==}"
+%% ODER: format /=         = "\neq "
+\makeatletter
+
+\usepackage{amstext}
+\usepackage{amssymb}
+\usepackage{stmaryrd}
+\DeclareFontFamily{OT1}{cmtex}{}
+\DeclareFontShape{OT1}{cmtex}{m}{n}
+  {<5><6><7><8>cmtex8
+   <9>cmtex9
+   <10><10.95><12><14.4><17.28><20.74><24.88>cmtex10}{}
+\DeclareFontShape{OT1}{cmtex}{m}{it}
+  {<-> ssub * cmtt/m/it}{}
+\newcommand{\texfamily}{\fontfamily{cmtex}\selectfont}
+\DeclareFontShape{OT1}{cmtt}{bx}{n}
+  {<5><6><7><8>cmtt8
+   <9>cmbtt9
+   <10><10.95><12><14.4><17.28><20.74><24.88>cmbtt10}{}
+\DeclareFontShape{OT1}{cmtex}{bx}{n}
+  {<-> ssub * cmtt/bx/n}{}
+\newcommand{\tex}[1]{\text{\texfamily#1}}	% NEU
+
+\newcommand{\Sp}{\hskip.33334em\relax}
+
+\newlength{\lwidth}\setlength{\lwidth}{4.5cm}
+\newlength{\cwidth}\setlength{\cwidth}{8mm} % 3mm
+
+\newcommand{\Conid}[1]{\mathit{#1}}
+\newcommand{\Varid}[1]{\mathit{#1}}
+\newcommand{\anonymous}{\kern0.06em \vbox{\hrule\@width.5em}}
+\newcommand{\plus}{\mathbin{+\!\!\!+}}
+\newcommand{\bind}{\mathbin{>\!\!\!>\mkern-6.7mu=}}
+\newcommand{\sequ}{\mathbin{>\!\!\!>}}
+\renewcommand{\leq}{\leqslant}
+\renewcommand{\geq}{\geqslant}
+\newcommand{\NB}{\textbf{NB}}
+\newcommand{\Todo}[1]{$\langle$\textbf{To do:}~#1$\rangle$}
+
+\makeatother
+\bibliographystyle{plain}
+
+\parskip=\medskipamount
+\parindent=0pt
+
+\newcommand{\isa}{\ensuremath{\; {:}{:}{=} \;}}
+\newcommand{\ora}{\ensuremath{\;\mid\;}}
+\newcommand{\IF}{\ensuremath{\mathtt{ if \;}}}
+\newcommand{\THEN}{\ensuremath{\mathtt{\; then \;}}}
+\newcommand{\ELSE}{\ensuremath{\mathtt{\; else \;}}}
+\newcommand{\TRUE}{\ensuremath{\mathtt{ true \;}}}
+\newcommand{\FALSE}{\ensuremath{\mathtt{\; false \;}}}
+\newcommand{\BOOL}{\ensuremath{\mathtt{\; Bool \;}}}
+\newcommand{\INT}{\ensuremath{\mathtt{\; Int \;}}}
+\newcommand{\PLUS}{\ensuremath{\mathtt{ plus \;}}}
+\newcommand{\MINUS}{\ensuremath{\mathtt{ sub \;}}}
+
+\title{Monadic Typed Lambda Calculus Interpreter}
+\author{Perry Alexander \\
+  ITTC - The University of Kansas \\
+  2335 Irving Hill Rd \\
+  Lawrence, KS 66045 \\
+  \texttt{alex@ittc.ku.edu}}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+The objective of this project is to write an interpreter for an
+extended simply typed lambda calculus ($\lambda_\rightarrow$) based on
+definitions from \emph{Types and Programming Languages}~\cite{Pie02a},
+Chapter 8, Figure 8-1 and Chapter 9, Figure 9-1.  We will enhance the
+basic language to include integers and integer sum and difference in
+addition to the basic operations.  The definition of the abstract
+syntax provides the following forms for $\lambda_\rightarrow$ terms,
+values and types in:
+
+\begin{eqnarray*}
+  t & \isa & x \ora v \ora \lambda x:T.t \ora t\; t \ora \PLUS t\; t \ora \MINUS t\;
+  t \\
+  v & \isa & \lambda x:T.t \ora \mathcal{I} \ora \mathtt{true} \ora \mathtt{false}\\
+  T & \isa & \BOOL \ora \INT \ora T \rightarrow T
+\end{eqnarray*}
+
+The definition for call-by-value evaluation provides the following
+evaluation rules that will define the evaluation function:
+
+\[\vcenter{\infer[\textsc{E-App1}]
+  {t_1 t_2 \longrightarrow t_1^{'} t_2}
+  {t_1\longrightarrow t_1^{'}}}\]
+
+\[\vcenter{\infer[\textsc{E-App2}]
+  {t_1 t_2 \longrightarrow t_1 t_2^{'}}
+  {t_2\longrightarrow t_2^{'}}}\]
+
+\[\vcenter{\infer[\textsc{E-AppAbs}]
+  {(\lambda x:T.t_{12})v_2 \longrightarrow [x\rightarrow v_2]t_{12}}
+  {}}\]
+
+\[\vcenter{\infer[\textsc{E-IfTrue}]
+  {t_2}
+  {\IF \TRUE \THEN t_2 \ELSE t_3}}\]
+
+\[\vcenter{\infer[\textsc{E-IfFalse}]
+  {t_3}
+  {\IF \FALSE \THEN t_2 \ELSE t_3}}\]
+
+\[\vcenter{\infer[\textsc{E-If}]
+  {\IF t_1 \THEN t_2 \ELSE t_3 \rightarrow \IF t_1^{'} \THEN t_2 \ELSE t_3}
+  {t_1\rightarrow t_1^{'}}}
+\]
+
+\[\vcenter{\infer[\textsc{E-Plus1}]
+  {\PLUS t_1^{'}\; t_2^{'}}
+  {t_1\rightarrow t_1^{'} & t_2\rightarrow t_2^{'}}}
+\]
+
+\[\vcenter{\infer[\textsc{E-Plus2}]
+  {\mathcal{I}_1 + \mathcal{I}_2}
+  {\PLUS \mathcal{I}_1\; \mathcal{I}_2}}
+\]
+
+\[\vcenter{\infer[\textsc{E-Minus1}]
+  {\MINUS t_1^{'}\; t_2^{'}}
+  {t_1\rightarrow t_1^{'} & t_2\rightarrow t_2^{'}}}
+\]
+
+\[\vcenter{\infer[\textsc{E-Minus2}]
+  {\mathcal{I}_1 - \mathcal{I}_2}
+  {\MINUS \mathcal{I}_1\; \mathcal{I}_2}}
+\]
+
+where $\mathcal{I}$ is any constant integer value.
+
+The following typing rules that define the type inference function:
+
+\[\vcenter{\infer[\textsc{T-Var}]{\Gamma\vdash x:T}{x:T\in\Gamma}}\]
+
+\[\vcenter{\infer[\textsc{T-Abs}]
+  {\Gamma\vdash\lambda x:T_1.t_2 : T_1\rightarrow T_2}
+  {\Gamma,x:T_1\vdash t_2 : T_2}}
+\]
+
+\[\vcenter{\infer[\textsc{T-App}]
+  {\Gamma\vdash t_1\; t_2 : T_{12}}
+  {\Gamma\vdash t_1 : T_{11}\rightarrow T_{12} & \Gamma\vdash t_2:T_{11}}}
+\]
+
+\[\vcenter{\infer[\textsc{T-If}]
+  {\Gamma\vdash \IF t_1 \THEN t_2 \ELSE t_3 : T}
+  {\Gamma\vdash t_1 : \BOOL & \Gamma\vdash t_2 : T & \Gamma\vdash t_3 : T}}
+\]
+
+\[\vcenter{\infer[\textsc{T-True}]{\TRUE:\BOOL}{}}\]
+
+\[\vcenter{\infer[\textsc{T-False}]{\FALSE:\BOOL}{}}\]
+
+\[\vcenter{\infer[\textsc{T-Plus}]
+  {\PLUS t_1\; t_2 : \INT}
+  {t_1 : \INT & t_2 : \INT}}
+\]
+
+\[\vcenter{\infer[\textsc{T-Minus}]
+  {\MINUS t_1\; t_2 : \INT}
+  {t_1 : \INT & t_2 : \INT}}
+\]
+
+Our objective is to: (i) define a data structure for representing
+$\lambda_\rightarrow$ terms embodying the abstract syntax; (ii) a type
+derivation function for $\lambda_\rightarrow$ terms embodying the type
+rules; and (iii) an evaluation function for $\lambda_\rightarrow$
+terms embodying the evaluation rules.
+
+\section{Abstract Syntax}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{module}\;\Conid{TypedLambdaAST}}$\\
+${\hskip2.00em\relax\mathbf{where}}$\\
+${}$\\
+${\mathbf{import}\;\Conid{LangUtils}}$
+\end{tabbing}
+\subsection{Type Language}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{TyBase}\;\Varid{ty}\mathrel{=}\Conid{TyBool}\mid \Conid{TyInt}\;\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$\\
+${}$\\
+${\mathbf{data}\;\Conid{TyAbs}\;\Varid{ty}\mathrel{=}\Varid{ty}\mathbin{:->:}\Varid{ty}\;\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$\\
+${}$\\
+${\mathbf{type}\;\Conid{TyLangSum}\mathrel{=}(\Conid{Sum}\;\Conid{TyBase}\;\Conid{TyAbs})}$\\
+${}$\\
+${\mathbf{type}\;\Conid{TyLang}\mathrel{=}\Conid{Rec}\;\Conid{TyLangSum}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Eq}\;\Conid{TyLang}\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{x}\equiv \Varid{y}\mathrel{=}(\Varid{unS}\;(\Varid{out}\;\Varid{x}))\equiv (\Varid{unS}\;(\Varid{out}\;\Varid{y}))}$
+\end{tabbing}
+\subsection{Term Language}
+
+The term language include Boolean values and integer values, addition
+and subtraction operators, if-then-else expressions, and lambda
+expressions and lambda application.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{TmBool}\;\Varid{te}\mathrel{=}\Conid{TmTrue}\mid \Conid{TmFalse}\;\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Functor}\;\Conid{TmBool}\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{map}_{f}\;\Varid{f}\;\Conid{TmTrue}\mathrel{=}\Conid{TmTrue}}$\\
+${\hskip2.00em\relax\Varid{map}_{f}\;\Varid{f}\;\Conid{TmFalse}\mathrel{=}\Conid{TmFalse}}$\\
+${}$\\
+${\mathbf{data}\;\Conid{TmInt}\;\Varid{te}\mathrel{=}\Conid{TmConstInt}\;\Conid{Int}\;\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Functor}\;\Conid{TmInt}\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{map}_{f}\;\Varid{f}\;(\Conid{TmConstInt}\;\Varid{x})\mathrel{=}(\Conid{TmConstInt}\;\Varid{x})}$\\
+${}$\\
+${\mathbf{data}\;\Conid{TmOp}\;\Varid{te}\mathrel{=}\Conid{TmAdd}\;\Varid{te}\;\Varid{te}\mid \Conid{TmSub}\;\Varid{te}\;\Varid{te}\;\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Functor}\;\Conid{TmOp}\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{map}_{f}\;\Varid{f}\;(\Conid{TmAdd}\;\Varid{x}\;\Varid{y})\mathrel{=}(\Conid{TmAdd}\;(\Varid{f}\;\Varid{x})\;(\Varid{f}\;\Varid{y}))}$\\
+${\hskip2.00em\relax\Varid{map}_{f}\;\Varid{f}\;(\Conid{TmSub}\;\Varid{x}\;\Varid{y})\mathrel{=}(\Conid{TmSub}\;(\Varid{f}\;\Varid{x})\;(\Varid{f}\;\Varid{y}))}$\\
+${}$\\
+${\mathbf{data}\;\Conid{TmIf}\;\Varid{te}\mathrel{=}\Conid{If}\;\Varid{te}\;\Varid{te}\;\Varid{te}\;\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Functor}\;\Conid{TmIf}\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{map}_{f}\;\Varid{f}\;(\Conid{If}\;\Varid{c}\;\Varid{t}\;\Varid{e})\mathrel{=}(\Conid{If}\;(\Varid{f}\;\Varid{c})\;(\Varid{f}\;\Varid{t})\;(\Varid{f}\;\Varid{e}))}$\\
+${}$\\
+${\mathbf{data}\;\Conid{TmVar}\;\Varid{t}\mathrel{=}\Conid{TmVar}\;\Conid{String}\;\mathbf{deriving}\;(\Conid{Show},\Conid{Eq})}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Functor}\;\Conid{TmVar}\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{map}_{f}\;\Varid{f}\;(\Conid{TmVar}\;\Varid{x})\mathrel{=}(\Conid{TmVar}\;\Varid{x})}$\\
+${}$\\
+${\mathbf{data}\;\Conid{TmFn}\;\Varid{t}\mathrel{=}\Conid{TmLambda}\;\Conid{String}\;\Conid{TyLang}\;\Varid{t}}$\\
+${\phantom{\mathbf{data}\;\Conid{TmFn}\;\Varid{t}\mbox{}}\mid \Conid{TmApp}\;\Varid{t}\;\Varid{t}}$\\
+${\phantom{\mathbf{data}\;\Conid{TmFn}\;\Varid{t}\mbox{}}\phantom{\mid \mbox{}}\mathbf{deriving}\;(\Conid{Eq})}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Functor}\;\Conid{TmFn}\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{map}_{f}\;\Varid{f}\;(\Conid{TmLambda}\;\Varid{s}\;\Varid{ty}\;\Varid{te})\mathrel{=}(\Conid{TmLambda}\;\Varid{s}\;\Varid{ty}\;(\Varid{f}\;\Varid{te}))}$\\
+${\hskip2.00em\relax\Varid{map}_{f}\;\Varid{f}\;(\Conid{TmApp}\;\Varid{te1}\;\Varid{te2})\mathrel{=}(\Conid{TmApp}\;(\Varid{f}\;\Varid{te1})\;(\Varid{f}\;\Varid{te2}))}$\\
+${}$\\
+${\mathbf{type}\;\Conid{TmLangSum}\mathrel{=}(\Conid{Sum}\;\Conid{TmBool}}$\\
+${\phantom{\mathbf{type}\;\Conid{TmLangSum}\mathrel{=}(\mbox{}}(\Conid{Sum}\;\Conid{TmInt}}$\\
+${\phantom{\mathbf{type}\;\Conid{TmLangSum}\mathrel{=}(\mbox{}}\phantom{(\mbox{}}(\Conid{Sum}\;\Conid{TmOp}}$\\
+${\phantom{\mathbf{type}\;\Conid{TmLangSum}\mathrel{=}(\mbox{}}\phantom{(\mbox{}}\phantom{(\mbox{}}(\Conid{Sum}\;\Conid{TmIf}}$\\
+${\phantom{\mathbf{type}\;\Conid{TmLangSum}\mathrel{=}(\mbox{}}\phantom{(\mbox{}}\phantom{(\mbox{}}\phantom{(\mbox{}}(\Conid{Sum}\;\Conid{TmVar}\;\Conid{TmFn})))))}$\\
+${}$\\
+${\mathbf{type}\;\Conid{TmLang}\mathrel{=}\Conid{Rec}\;\Conid{TmLangSum}}$\\
+${}$\\
+${}$\\
+${\Varid{toTmLang}\mathbin{::}(\Conid{Subsum}\;\Varid{f}\;\Conid{TmLangSum})\Rightarrow \Varid{f}\;\Conid{TmLang}\to \Conid{TmLang}}$\\
+${\Varid{toTmLang}\mathrel{=}\Varid{toSum}}$
+\end{tabbing}
+\section{Environment}
+
+This very simple module defines a standard environment parameterized
+over a stored type.  It is used to define both \ensuremath{\Varid{\Gamma}} for the type
+checking routine and the environment for the evaluation routine.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{module}\;\Conid{TypedLambdaEnv}\;\mathbf{where}}$\\
+${}$\\
+${\mathbf{type}\;\Conid{Environment}\;\Varid{a}\mathrel{=}[\mskip1.5mu (\Conid{String},\Varid{a})\mskip1.5mu]}$\\
+${}$\\
+${\Varid{lookupEnv}\mathbin{::}(\Conid{Eq}\;\Varid{a})\Rightarrow \Conid{String}\to (\Conid{Environment}\;\Varid{a})\to (\Conid{Maybe}\;\Varid{a})}$\\
+${\Varid{lookupEnv}\;\Varid{s}\;\Varid{e}\mathrel{=}\Varid{lookup}\;\Varid{s}\;\Varid{e}}$
+\end{tabbing}
+\section{Type Checking}
+
+\subsection{Type Values}
+
+These are the type values available in our language.  For the type
+language, this will serve as the carrier set or value space for both
+the type langauge and the term language under type checking.  \ensuremath{\Varid{\phi}}
+for the type language is defined over \ensuremath{\Varid{Ty}_{\mathcal D}\;\Varid{a}} while \ensuremath{\Varid{\phi}} for the term
+language type checker is defined over \ensuremath{\Varid{T}_{n-1}\;\Varid{a}}.  In effect, \ensuremath{\Varid{\phi}}
+evaluates the term language to a type value rather than a term value.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{module}\;\Conid{TypedLambdaTypesT}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\mathbf{import}\;\Conid{LangUtils}}$\\
+${\hskip1.00em\relax\mathbf{import}\;\Conid{TypedLambdaAST}}$\\
+${\hskip1.00em\relax\mathbf{import}\;\Conid{TypedLambdaEnv}}$\\
+${\hskip1.00em\relax\mathbf{import}\;\Conid{Monad}}$\\
+${\hskip1.00em\relax\mathbf{import}\;\Conid{\Conid{Control}.\Conid{Monad}.Error}}$\\
+${\hskip1.00em\relax\mathbf{import}\;\Conid{\Conid{Control}.\Conid{Monad}.Reader}}$
+\end{tabbing}
+Note that values are not interpreted, so no \ensuremath{\Conid{Algebra}} is needed.
+Technically, we could make \ensuremath{\Varid{\phi}\mathrel{=}\Varid{id}} for values, but it's not
+necessary to think about this right now.
+
+\subsubsection{Boolean and Integer Type Value}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{data}\;\Conid{TyBaseVal}\;\Varid{ty}\mathrel{=}\Conid{TyBoolVal}\mid \Conid{TyIntVal}\;\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Functor}\;\Conid{TyBaseVal}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{map}_{f}\;\Varid{f}\;\Conid{TyBoolVal}\mathrel{=}\Conid{TyBoolVal}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{map}_{f}\;\Varid{f}\;\Conid{TyIntVal}\mathrel{=}\Conid{TyIntVal}}$
+\end{tabbing}
+\subsubsection{Abstraction Type Value}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{data}\;\Conid{TyAbsVal}\;\Varid{ty}\mathrel{=}\Conid{TyAbsVal}\;\Varid{ty}\;\Varid{ty}\;\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Functor}\;\Conid{TyAbsVal}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{map}_{f}\;\Varid{f}\;(\Conid{TyAbsVal}\;\Varid{x}\;\Varid{y})\mathrel{=}\Conid{TyAbsVal}\;(\Varid{f}\;\Varid{x})\;(\Varid{f}\;\Varid{y})}$
+\end{tabbing}
+\subsubsection{Type Value}
+
+The value space sum for types is the sum of the base values (integer
+and boolean) and the abstraction value and is called \ensuremath{\Conid{TyValSum}}.  The
+set of type values is the fixed point, \ensuremath{\Conid{TyVal}}.  \ensuremath{\Conid{TyVal}} is an
+instance of \ensuremath{\Conid{Show}} and \ensuremath{\Conid{Eq}} to allow printing and comparing values.
+\ensuremath{\Varid{toTyVal}} injects elements from \ensuremath{\Conid{TyVal}} components into the value
+space.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{type}\;\Conid{TyValSum}\mathrel{=}(\Conid{Sum}\;\Conid{TyBaseVal}\;\Conid{TyAbsVal})}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;(\Conid{Show}\;(\Varid{f}\;\Varid{a}),\Conid{Show}\;(\Varid{g}\;\Varid{a}))\Rightarrow \Conid{Show}\;(\Conid{Sum}\;\Varid{f}\;\Varid{g}\;\Varid{a})\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{show}\;(\Conid{S}\;(\Conid{\Conid{Prelude}.Left}\;\Varid{x}))\mathrel{=}(\text{\tt \char34 (Left~\char34}\plus (\Varid{show}\;\Varid{x})\plus \text{\tt \char34 )\char34})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{show}\;(\Conid{S}\;(\Conid{\Conid{Prelude}.Right}\;\Varid{x}))\mathrel{=}(\text{\tt \char34 (Right~\char34}\plus (\Varid{show}\;\Varid{x})\plus \text{\tt \char34 )\char34})}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{type}\;\Conid{TyVal}\mathrel{=}\Conid{Rec}\;\Conid{TyValSum}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Show}\;\Conid{TyVal}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{show}\;\Varid{x}\mathrel{=}\Varid{show}\;(\Varid{out}\;\Varid{x})}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Eq}\;\Conid{TyVal}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{x}\equiv \Varid{y}\mathrel{=}(\Varid{unS}\;(\Varid{out}\;\Varid{x}))\equiv (\Varid{unS}\;(\Varid{out}\;\Varid{y}))}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{toTyVal}\mathbin{::}(\Conid{Subsum}\;\Varid{f}\;\Conid{TyValSum})\Rightarrow \Varid{f}\;\Conid{TyVal}\to \Conid{TyVal}}$\\
+${\hskip1.00em\relax\Varid{toTyVal}\mathrel{=}\Varid{toSum}}$
+\end{tabbing}
+\subsection{The Reader Error Monad}
+
+The monad used for handling the environment and error messages will be
+formed by composing a \ensuremath{\Conid{Reader}} with and \ensuremath{\Conid{ErrorMonad}}.  First we define
+the error handling aspects, then embed the \ensuremath{\Conid{ErrorMonad}} in a \ensuremath{\Conid{Reader}}
+using \ensuremath{\Conid{ReaderT}}.
+
+The \ensuremath{\Conid{Either}} type constructor is already an instance of the
+\ensuremath{\Conid{MonadError}} class.  Thus, it is not necessary to define \ensuremath{\Varid{throwError}}
+and \ensuremath{\Varid{catchError}} explicitly for the type.  The definitions are
+included here for documentation, but are not loaded.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{MonadError}\;(\Conid{Either}\;\Varid{e})\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{throwError}\mathrel{=}\Conid{Left}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{catchError}\;(\Conid{Left}\;\Varid{e})\;\Varid{handler}\mathrel{=}\Varid{handler}\;\Varid{e}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{catchError}\;\Varid{a}\;\anonymous \mathrel{=}\Varid{a}}$
+\end{tabbing}
+\ensuremath{\Conid{TyError}} is a simple data type for storing errors. We could simply
+store the error string rather than create a type.  However, \ensuremath{\Conid{TyError}}
+serves as a placeholder if we want to do fancier things later.
+\ensuremath{\Conid{TyError}} is also an instance of the standard \ensuremath{\Conid{Error}}.
+ 
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{data}\;\Conid{TyError}\mathrel{=}\Conid{Err}\;\Conid{String}\;\mathbf{deriving}\;(\Conid{Show},\Conid{Eq})}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Error}\;\Conid{TyError}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{noMsg}\mathrel{=}\Conid{Err}\;\text{\tt \char34 Type~Error\char34}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{strMsg}\;\Varid{s}\mathrel{=}\Conid{Err}\;\Varid{s}}$
+\end{tabbing}
+\ensuremath{\Varid{\Gamma}} defines the data structure used for a binding list.  It is
+simply a list of \ensuremath{(\Conid{String},\Conid{TyVal})} pairs.  Adding a binding appends it
+to the front of a binding list and looking up a binding is handled in
+the canonical fashion.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{type}\;\Varid{\Gamma}\mathrel{=}\Conid{Environment}\;\Conid{TyVal}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{addBinding}\mathbin{::}\Varid{\Gamma}\to (\Conid{String},\Conid{TyVal})\to \Varid{\Gamma}}$\\
+${\hskip1.00em\relax\Varid{addBinding}\;\Varid{g}\;\Varid{t}\mathrel{=}(\Varid{t}\mathbin{:}\Varid{g})}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{lookupGamma}\mathbin{::}\Conid{String}\to \Varid{\Gamma}\to \Conid{Maybe}\;\Conid{TyVal}}$\\
+${\hskip1.00em\relax\Varid{lookupGamma}\mathrel{=}\Varid{lookup}}$
+\end{tabbing}
+\ensuremath{\Conid{TyMonad}} defines the actual monad used by the type checker.  The
+signature of \ensuremath{\Conid{TyMonad}} is a bit odd.  It must be a type constructor
+and thus must have one argument.  \ensuremath{\Conid{ReaderT}} is applied to a \ensuremath{\Varid{\Gamma}}
+and \ensuremath{(\Conid{Either}\;\Conid{TyError})} leaving the last argument to \ensuremath{\Conid{TyError}} as an
+argument to \ensuremath{\Conid{TyMonad}}.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{type}\;\Conid{TyMonad}\mathrel{=}\Conid{ReaderT}\;\Varid{\Gamma}\;(\Conid{Either}\;\Conid{TyError})\;\Conid{TyVal}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Subtype}\;\Conid{TyError}\;(\Conid{Either}\;\Conid{TyError}\;\Conid{TyVal})\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\uparrow}\;\Varid{x}\mathrel{=}(\Conid{Left}\;\Varid{x})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\downarrow}\;(\Conid{Left}\;\Varid{x})\mathrel{=}\Conid{Just}\;\Varid{x}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\downarrow}\;(\Conid{Right}\;\Varid{x})\mathrel{=}\Conid{Nothing}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Subtype}\;\Conid{TyVal}\;(\Conid{Either}\;\Conid{TyError}\;\Conid{TyVal})\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\uparrow}\;\Varid{x}\mathrel{=}(\Conid{Right}\;\Varid{x})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\downarrow}\;(\Conid{Right}\;\Varid{x})\mathrel{=}\Conid{Just}\;\Varid{x}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\downarrow}\;(\Conid{Left}\;\Varid{x})\mathrel{=}\Conid{Nothing}}$
+\end{tabbing}
+\subsection{Type Language}
+
+The type language defines the language for types over the type values.
+The type language will be \ensuremath{\Varid{f}} and defined over the type value space
+serving as \ensuremath{\Varid{a}} in an algebra definition.
+
+\subsubsection{Base Types}
+
+The Base Types represent integer and boolean atomic types.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Functor}\;\Conid{TyBase}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{map}_{f}\;\Varid{f}\;\Conid{TyBool}\mathrel{=}\Conid{TyBool}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{map}_{f}\;\Varid{f}\;\Conid{TyInt}\mathrel{=}\Conid{TyInt}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Algebra}\;\Conid{TyBase}\;\Conid{TyMonad}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\phi}\;\Conid{TyBool}\mathrel{=}\Varid{return}\mathbin{\$}\Varid{\uparrow}\mathbin{\$}\Varid{toTyVal}\;\Conid{TyBoolVal}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\phi}\;\Conid{TyInt}\mathrel{=}\Varid{return}\mathbin{\$}\Varid{\uparrow}\mathbin{\$}\Varid{toTyVal}\;\Conid{TyIntVal}}$
+\end{tabbing}
+\subsubsection{Abstraction Type}
+
+Typically thought of as a function type, the abstraction type
+represents a mapping from a range type to a domain type.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Functor}\;\Conid{TyAbs}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{map}_{f}\;\Varid{f}\;(\Varid{x}\mathbin{:->:}\Varid{y})\mathrel{=}(\Varid{f}\;\Varid{x})\mathbin{:->:}(\Varid{f}\;\Varid{y})}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Algebra}\;\Conid{TyAbs}\;\Conid{TyMonad}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\phi}\;(\Varid{x}\mathbin{:->:}\Varid{y})\mathrel{=}\mathbf{do}\;\{\mskip1.5mu \Varid{x'}\leftarrow \Varid{x}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Varid{x}\mathbin{:->:}\Varid{y})\mathrel{=}\mathbf{do}\;\mbox{}};\Varid{y'}\leftarrow \Varid{y}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Varid{x}\mathbin{:->:}\Varid{y})\mathrel{=}\mathbf{do}\;\mbox{}};\Varid{return}\mathbin{\$}\Varid{\uparrow}\mathbin{\$}\Varid{toTyVal}\;(\Conid{TyAbsVal}\;\Varid{x'}\;\Varid{y'})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Varid{x}\mathbin{:->:}\Varid{y})\mathrel{=}\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$
+\end{tabbing}
+Define a utility function for converting a type term into the type
+language.  The \ensuremath{\Varid{evalTy}} function is a separate function for evaluating
+elements of the type language.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\Varid{toTyLang}\mathbin{::}(\Conid{Subsum}\;\Varid{f}\;\Conid{TyLangSum})\Rightarrow \Varid{f}\;\Conid{TyLang}\to \Conid{TyLang}}$\\
+${\hskip1.00em\relax\Varid{toTyLang}\mathrel{=}\Varid{toSum}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{evalTy}\mathbin{::}\Conid{TyLang}\to \Conid{TyMonad}}$\\
+${\hskip1.00em\relax\Varid{evalTy}\mathrel{=}\Varid{cata}}$
+\end{tabbing}
+\subsection{Type Checking Functions}
+
+The type checking functions are defined by defining an algebra from
+\ensuremath{\Conid{TmLang}} to \ensuremath{\Conid{TyMonad}}.  Thus, \ensuremath{\Conid{TyMonad}} is the carrier set for the
+\ensuremath{\Conid{TmLang}} algebra and \ensuremath{\Varid{\phi}} defines the evaluation function.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Algebra}\;\Conid{TmBool}\;\Conid{TyMonad}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\phi}\;\Conid{TmTrue}\mathrel{=}\Varid{return}\mathbin{\$}\Varid{\uparrow}\mathbin{\$}\Varid{toTyVal}\;\Conid{TyBoolVal}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\phi}\;\Conid{TmFalse}\mathrel{=}\Varid{return}\mathbin{\$}\Varid{\uparrow}\mathbin{\$}\Varid{toTyVal}\;\Conid{TyBoolVal}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Algebra}\;\Conid{TmInt}\;\Conid{TyMonad}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\phi}\;(\Conid{TmConstInt}\;\Varid{x})\mathrel{=}\Varid{return}\mathbin{\$}\Varid{\uparrow}\mathbin{\$}\Varid{toTyVal}\;\Conid{TyIntVal}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Algebra}\;\Conid{TmOp}\;\Conid{TyMonad}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\phi}\;(\Conid{TmAdd}\;\Varid{x}\;\Varid{y})\mathrel{=}\mathbf{do}\;\{\mskip1.5mu \Varid{x'}\leftarrow \Varid{x}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{TmAdd}\;\Varid{x}\;\Varid{y})\mathrel{=}\mathbf{do}\;\mbox{}};\Varid{y'}\leftarrow \Varid{y}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{TmAdd}\;\Varid{x}\;\Varid{y})\mathrel{=}\mathbf{do}\;\mbox{}};\mathbf{if}\;(\Varid{x'}\equiv (\Varid{toTyVal}\;\Conid{TyIntVal})\mathrel{\wedge}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{TmAdd}\;\Varid{x}\;\Varid{y})\mathrel{=}\mathbf{do}\;\mbox{}}\phantom{;\mathbf{if}\;(\mbox{}}\Varid{y'}\equiv (\Varid{toTyVal}\;\Conid{TyIntVal}))}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{TmAdd}\;\Varid{x}\;\Varid{y})\mathrel{=}\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\mathbf{then}\;\Varid{return}\mathbin{\$}\Varid{\uparrow}\mathbin{\$}\Varid{toTyVal}\;\Conid{TyIntVal}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{TmAdd}\;\Varid{x}\;\Varid{y})\mathrel{=}\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\mathbf{else}\;\Varid{throwError}\mathbin{\$}\Conid{Err}\;\text{\tt \char34 Argument~to~Add~not~Integer\char34}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{TmAdd}\;\Varid{x}\;\Varid{y})\mathrel{=}\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\phi}\;(\Conid{TmSub}\;\Varid{x}\;\Varid{y})\mathrel{=}\mathbf{do}\;\{\mskip1.5mu \Varid{x'}\leftarrow \Varid{x}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{TmSub}\;\Varid{x}\;\Varid{y})\mathrel{=}\mathbf{do}\;\mbox{}};\Varid{y'}\leftarrow \Varid{y}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{TmSub}\;\Varid{x}\;\Varid{y})\mathrel{=}\mathbf{do}\;\mbox{}};\mathbf{if}\;(\Varid{x'}\equiv (\Varid{toTyVal}\;\Conid{TyIntVal})\mathrel{\wedge}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{TmSub}\;\Varid{x}\;\Varid{y})\mathrel{=}\mathbf{do}\;\mbox{}}\phantom{;\mathbf{if}\;(\mbox{}}\Varid{y'}\equiv (\Varid{toTyVal}\;\Conid{TyIntVal}))}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{TmSub}\;\Varid{x}\;\Varid{y})\mathrel{=}\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\mathbf{then}\;\Varid{return}\mathbin{\$}\Varid{\uparrow}\mathbin{\$}\Varid{toTyVal}\;\Conid{TyIntVal}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{TmSub}\;\Varid{x}\;\Varid{y})\mathrel{=}\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\mathbf{else}\;\Varid{throwError}\mathbin{\$}\Conid{Err}\;\text{\tt \char34 Argument~to~Sub~not~Integer\char34}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{TmSub}\;\Varid{x}\;\Varid{y})\mathrel{=}\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Algebra}\;\Conid{TmIf}\;\Conid{TyMonad}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\phi}\;(\Conid{If}\;\Varid{c}\;\Varid{t}\;\Varid{e})\mathrel{=}\mathbf{do}\;\{\mskip1.5mu \Varid{c'}\leftarrow \Varid{c}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{If}\;\Varid{c}\;\Varid{t}\;\Varid{e})\mathrel{=}\mathbf{do}\;\mbox{}};\Varid{t'}\leftarrow \Varid{t}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{If}\;\Varid{c}\;\Varid{t}\;\Varid{e})\mathrel{=}\mathbf{do}\;\mbox{}};\Varid{e'}\leftarrow \Varid{e}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{If}\;\Varid{c}\;\Varid{t}\;\Varid{e})\mathrel{=}\mathbf{do}\;\mbox{}};\mathbf{if}\;(\Varid{c'}\equiv (\Varid{toTyVal}\;\Conid{TyBoolVal})\mathrel{\wedge}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{If}\;\Varid{c}\;\Varid{t}\;\Varid{e})\mathrel{=}\mathbf{do}\;\mbox{}}\phantom{;\mathbf{if}\;(\mbox{}}\Varid{t'}\equiv \Varid{e'})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{If}\;\Varid{c}\;\Varid{t}\;\Varid{e})\mathrel{=}\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\mathbf{then}\;\Varid{return}\mathbin{\$}\Varid{\uparrow}\;\Varid{t'}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{If}\;\Varid{c}\;\Varid{t}\;\Varid{e})\mathrel{=}\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\mathbf{else}\;\Varid{throwError}\mathbin{\$}\Conid{Err}\;\text{\tt \char34 Either~condition~is~not~boolean~or~then~and~else~are~not~of~same~type~in~If\char34}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{If}\;\Varid{c}\;\Varid{t}\;\Varid{e})\mathrel{=}\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Algebra}\;\Conid{TmVar}\;\Conid{TyMonad}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\phi}\;(\Conid{TmVar}\;\Varid{s})\mathrel{=}\mathbf{do}\;\{\mskip1.5mu \Varid{val}\leftarrow \Varid{asks}\;(\Varid{lookupGamma}\;\Varid{s})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{TmVar}\;\Varid{s})\mathrel{=}\mathbf{do}\;\mbox{}};\mathbf{case}\;\Varid{val}\;\mathbf{of}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{TmVar}\;\Varid{s})\mathrel{=}\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\Conid{Just}\;\Varid{x}\to \Varid{return}\;\Varid{x}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{TmVar}\;\Varid{s})\mathrel{=}\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\Conid{Nothing}\to \Varid{throwError}\mathbin{\$}\Conid{Err}\;(\text{\tt \char34 Variable~\char34}\plus (\Varid{s}\plus \text{\tt \char34 ~not~found\char34}))}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{TmVar}\;\Varid{s})\mathrel{=}\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Algebra}\;\Conid{TmFn}\;\Conid{TyMonad}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\phi}\;(\Conid{TmLambda}\;\Varid{s}\;\Varid{ty}\;\Varid{te})\mathrel{=}\mathbf{do}\;\{\mskip1.5mu \Varid{\gamma}\leftarrow \Varid{ask}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{TmLambda}\;\Varid{s}\;\Varid{ty}\;\Varid{te})\mathrel{=}\mathbf{do}\;\mbox{}};\Varid{ty'}\leftarrow \Varid{evalTy}\;\Varid{ty}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{TmLambda}\;\Varid{s}\;\Varid{ty}\;\Varid{te})\mathrel{=}\mathbf{do}\;\mbox{}};\Varid{te'}\leftarrow \Varid{local}\;(\Varid{const}\;(\Varid{addBinding}\;\Varid{\gamma}\;(\Varid{s},\Varid{ty'})))\;\Varid{te}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{TmLambda}\;\Varid{s}\;\Varid{ty}\;\Varid{te})\mathrel{=}\mathbf{do}\;\mbox{}};\Varid{return}\mathbin{\$}\Varid{\uparrow}\mathbin{\$}\Varid{toTyVal}\;(\Conid{TyAbsVal}\;\Varid{ty'}\;\Varid{te'})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{TmLambda}\;\Varid{s}\;\Varid{ty}\;\Varid{te})\mathrel{=}\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\phi}\;(\Conid{TmApp}\;\Varid{te1}\;\Varid{te2})\mathrel{=}\mathbf{do}\;\{\mskip1.5mu \Varid{te1'}\leftarrow \Varid{te1}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{TmApp}\;\Varid{te1}\;\Varid{te2})\mathrel{=}\mathbf{do}\;\mbox{}};\Varid{te2'}\leftarrow \Varid{te2}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{TmApp}\;\Varid{te1}\;\Varid{te2})\mathrel{=}\mathbf{do}\;\mbox{}};\Varid{checkLambda}\;(\Varid{out}\;\Varid{te1'})\;\Varid{te2'}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{TmApp}\;\Varid{te1}\;\Varid{te2})\mathrel{=}\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{checkLambda}\;\Varid{l}\;\Varid{te2}\mathrel{=}\mathbf{case}\;(\Varid{\downarrow}_{S}\;\Varid{l})\;\mathbf{of}}$\\
+${\hskip1.00em\relax\phantom{\Varid{checkLambda}\;\Varid{l}\;\Varid{te2}\mathrel{=}\mbox{}}(\Conid{Just}\;(\Conid{TyAbsVal}\;\Varid{tty}\;\Varid{tte}))\to \mathbf{if}\;\Varid{tty}\equiv \Varid{te2}}$\\
+${\hskip1.00em\relax\phantom{\Varid{checkLambda}\;\Varid{l}\;\Varid{te2}\mathrel{=}\mbox{}}\hskip11.00em\relax\mathbf{then}\;\Varid{return}\mathbin{\$}\Varid{\uparrow}\;\Varid{tte}}$\\
+${\hskip1.00em\relax\phantom{\Varid{checkLambda}\;\Varid{l}\;\Varid{te2}\mathrel{=}\mbox{}}\hskip11.00em\relax\mathbf{else}\;\Varid{throwError}\mathbin{\$}\Conid{Err}\;\text{\tt \char34 Actual~parameter~type~does~not~match~formal~parameter~type\char34}}$\\
+${\hskip1.00em\relax\phantom{\Varid{checkLambda}\;\Varid{l}\;\Varid{te2}\mathrel{=}\mbox{}}\anonymous \to \Varid{throwError}\mathbin{\$}\Conid{Err}\;\text{\tt \char34 First~argument~to~application~must~be~a~Lambda\char34}}$
+\end{tabbing}
+The basic \ensuremath{\Varid{typeof}_{\mathcal D}} function is a catamorphism over the \ensuremath{\Conid{TmLang}\;\Conid{TyMonad}}.  The signature is specified to explicitly identify types.
+The \ensuremath{\Varid{runTypeof}} function is a utilty function that evaluates the
+\ensuremath{\Conid{Reader}} monad.  The initial environment is empty because there are no
+predefined symbols in our language.  \ensuremath{\Varid{runTypeof}} should be used to
+integrate the type checker with other language elements.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\Varid{typeof}_{\mathcal D}\mathbin{::}\Conid{TmLang}\to \Conid{TyMonad}}$\\
+${\hskip1.00em\relax\Varid{typeof}_{\mathcal D}\mathrel{=}\Varid{cata}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{runTypeof}\;\Varid{t}\mathrel{=}(\Varid{runReaderT}\;(\Varid{typeof}_{\mathcal D}\;\Varid{t})\;[\mskip1.5mu \mskip1.5mu])}$
+\end{tabbing}
+\section{Evaluation}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{module}\;\Conid{TypedLambdaEval}\;\mathbf{where}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{import}\;\Conid{LangUtils}}$\\
+${\hskip1.00em\relax\mathbf{import}\;\Conid{TypedLambdaEnv}}$\\
+${\hskip1.00em\relax\mathbf{import}\;\Conid{TypedLambdaAST}}$\\
+${\hskip1.00em\relax\mathbf{import}\;\Conid{\Conid{Control}.\Conid{Monad}.Reader}}$\\
+${\hskip1.00em\relax\mathbf{import}\;\Conid{\Conid{Control}.\Conid{Monad}.Error}}$
+\end{tabbing}  
+\subsection{Value Representation}
+
+There are three values associated with the Lambda language that all
+interpretable functions must converge to - booleans, integers, and
+lambda values.  Together, these are specified in the \ensuremath{\Conid{TmVal}}
+constructed type.  Note that this type is recursive, unlike the term
+language and type language specifications.  The \texttt{Haskell} types
+used to represent primitive values are defined to be subtypes of the
+aggregate \texttt{TmVal} type.  Thus, \ensuremath{\Varid{\downarrow}} and \ensuremath{\Varid{\uparrow}} are define
+between types.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{data}\;\Conid{TmVal}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\mathrel{=}\Conid{TmBoolVal}\;\Conid{Bool}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\mid \Conid{TmIntVal}\;\Conid{Int}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\mid \Conid{LambdaVal}\;(\Conid{TmValEnv}\to \Conid{TmValEnv})}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Show}\;\Conid{TmVal}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{show}\;(\Conid{TmBoolVal}\;\Varid{x})\mathrel{=}\Varid{show}\;\Varid{x}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{show}\;(\Conid{TmIntVal}\;\Varid{x})\mathrel{=}\Varid{show}\;\Varid{x}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{show}\;(\Conid{LambdaVal}\;\Varid{x})\mathrel{=}\text{\tt \char34 <Lambda~Value>\char34}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Subtype}\;\Conid{Bool}\;\Conid{TmVal}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\uparrow}\;\Varid{x}\mathrel{=}(\Conid{TmBoolVal}\;\Varid{x})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\downarrow}\;(\Conid{TmBoolVal}\;\Varid{x})\mathrel{=}\Conid{Just}\;\Varid{x}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\downarrow}\;(\Conid{TmIntVal}\;\anonymous )\mathrel{=}\Conid{Nothing}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\downarrow}\;(\Conid{LambdaVal}\;\anonymous )\mathrel{=}\Conid{Nothing}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Subtype}\;\Conid{Int}\;\Conid{TmVal}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\uparrow}\;\Varid{x}\mathrel{=}(\Conid{TmIntVal}\;\Varid{x})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\downarrow}\;(\Conid{TmBoolVal}\;\anonymous )\mathrel{=}\Conid{Nothing}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\downarrow}\;(\Conid{TmIntVal}\;\Varid{x})\mathrel{=}\Conid{Just}\;\Varid{x}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\downarrow}\;(\Conid{LambdaVal}\;\anonymous )\mathrel{=}\Conid{Nothing}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Subtype}\;(\Conid{TmValEnv}\to \Conid{TmValEnv})\;\Conid{TmVal}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\uparrow}\;\Varid{x}\mathrel{=}(\Conid{LambdaVal}\;\Varid{x})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\downarrow}\;(\Conid{TmBoolVal}\;\anonymous )\mathrel{=}\Conid{Nothing}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\downarrow}\;(\Conid{TmIntVal}\;\anonymous )\mathrel{=}\Conid{Nothing}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\downarrow}\;(\Conid{LambdaVal}\;\Varid{x})\mathrel{=}\Conid{Just}\;\Varid{x}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{type}\;\Conid{Env}\mathrel{=}\Conid{Environment}\;\Conid{TmVal}}$
+\end{tabbing}
+\subsection{The Evaluator Monad}
+
+The monad used to support evaluation is a composition of the
+\ensuremath{\Conid{ErrorMonad}} and the \ensuremath{\Conid{Reader}} monad with the \ensuremath{\Conid{ErrorMondad}}
+encapsulated by the \ensuremath{\Conid{Reader}}.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{data}\;\Conid{TmError}\mathrel{=}\Conid{Err}\;\Conid{String}\;\mathbf{deriving}\;(\Conid{Show},\Conid{Eq})}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Error}\;\Conid{TmError}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{noMsg}\mathrel{=}\Conid{Err}\;\text{\tt \char34 Type~Error\char34}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{strMsg}\;\Varid{s}\mathrel{=}\Conid{Err}\;\Varid{s}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{type}\;\Conid{TmValEnv}\mathrel{=}\Conid{ReaderT}\;\Conid{Env}\;(\Conid{Either}\;\Conid{TmError})\;\Conid{TmVal}}$
+\end{tabbing}
+\subsection{Expressions as Algebras}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Algebra}\;\Conid{TmBool}\;\Conid{TmValEnv}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\phi}\;\Conid{TmTrue}\mathrel{=}\Varid{return}\mathbin{\$}\Varid{\uparrow}\;\Conid{True}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\phi}\;\Conid{TmFalse}\mathrel{=}\Varid{return}\mathbin{\$}\Varid{\uparrow}\;\Conid{False}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Algebra}\;\Conid{TmInt}\;\Conid{TmValEnv}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\phi}\;(\Conid{TmConstInt}\;\Varid{x})\mathrel{=}\Varid{return}\mathbin{\$}\Varid{\uparrow}\;\Varid{x}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Algebra}\;\Conid{TmOp}\;\Conid{TmValEnv}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\phi}\;(\Conid{TmAdd}\;\Varid{x}\;\Varid{y})\mathrel{=}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\mathbf{do}\;\{\mskip1.5mu \Varid{x'}\leftarrow \Varid{x}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\phantom{\mathbf{do}\;\mbox{}};\Varid{y'}\leftarrow \Varid{y}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\phantom{\mathbf{do}\;\mbox{}};\mathbf{case}\;(\Varid{\downarrow}\;\Varid{x'})\;\mathbf{of}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\Conid{Just}\;\Varid{x''}\to \mathbf{case}\;(\Varid{\downarrow}\;\Varid{y'})\;\mathbf{of}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\phantom{\Conid{Just}\;\Varid{x''}\to \mbox{}}\Conid{Just}\;\Varid{y''}\to \Varid{return}\mathbin{\$}\Varid{\uparrow}\;((\Varid{x''}\mathbin{::}\Conid{Int})\mathbin{+}(\Varid{y''}\mathbin{::}\Conid{Int}))}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\phantom{\Conid{Just}\;\Varid{x''}\to \mbox{}}\Conid{Nothing}\to \Varid{error}\;((\Varid{show}\;\Varid{y'})\plus \text{\tt \char34 ~not~an~integer\char34})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\Conid{Nothing}\to \Varid{error}\;((\Varid{show}\;\Varid{x'})\plus \text{\tt \char34 ~not~an~integer\char34})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\phantom{\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\phi}\;(\Conid{TmSub}\;\Varid{x}\;\Varid{y})\mathrel{=}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\mathbf{do}\;\{\mskip1.5mu \Varid{x'}\leftarrow \Varid{x}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\phantom{\mathbf{do}\;\mbox{}};\Varid{y'}\leftarrow \Varid{y}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\phantom{\mathbf{do}\;\mbox{}};\mathbf{case}\;(\Varid{\downarrow}\;\Varid{x'})\;\mathbf{of}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\Conid{Just}\;\Varid{x''}\to \mathbf{case}\;(\Varid{\downarrow}\;\Varid{y'})\;\mathbf{of}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\hskip5.50em\relax\Conid{Just}\;\Varid{y''}\to \Varid{return}\mathbin{\$}\Varid{\uparrow}\;((\Varid{x''}\mathbin{::}\Conid{Int})\mathbin{-}(\Varid{y''}\mathbin{::}\Conid{Int}))}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\hskip5.50em\relax\Conid{Nothing}\to \Varid{error}\;((\Varid{show}\;\Varid{y'})\plus \text{\tt \char34 ~not~an~integer\char34})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\Conid{Nothing}\to \Varid{error}\;((\Varid{show}\;\Varid{x'})\plus \text{\tt \char34 ~not~an~integer\char34})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\phantom{\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Algebra}\;\Conid{TmIf}\;\Conid{TmValEnv}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\phi}\;(\Conid{If}\;\Varid{b}\;\Varid{t}\;\Varid{e})\mathrel{=}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\mathbf{do}\;\{\mskip1.5mu \Varid{b'}\leftarrow \Varid{b}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\phantom{\mathbf{do}\;\mbox{}};\mathbf{case}\;(\Varid{\downarrow}\;\Varid{b'})\;\mathbf{of}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\Conid{Just}\;\Varid{b''}\to \mathbf{if}\;\Varid{b''}\;\mathbf{then}\;\Varid{t}\;\mathbf{else}\;\Varid{e}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\Conid{Nothing}\to \Varid{error}\;((\Varid{show}\;\Varid{b'})\plus \text{\tt \char34 ~is~not~boolean\char34})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\phantom{\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Algebra}\;\Conid{TmVar}\;\Conid{TmValEnv}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\phi}\;(\Conid{TmVar}\;\Varid{v})\mathrel{=}\mathbf{do}\;\{\mskip1.5mu \Varid{val}\leftarrow \Varid{asks}\;(\Varid{lookup}\;\Varid{v})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{TmVar}\;\Varid{v})\mathrel{=}\mathbf{do}\;\mbox{}};\mathbf{case}\;\Varid{val}\;\mathbf{of}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{TmVar}\;\Varid{v})\mathrel{=}\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\Conid{Just}\;\Varid{x}\to \Varid{return}\;\Varid{x}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{TmVar}\;\Varid{v})\mathrel{=}\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\Conid{Nothing}\to \Varid{error}\;(\text{\tt \char34 Variable~\char34}\plus (\Varid{v}\plus \text{\tt \char34 ~not~found\char34}))}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;(\Conid{TmVar}\;\Varid{v})\mathrel{=}\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Algebra}\;\Conid{TmFn}\;\Conid{TmValEnv}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\phi}\;(\Conid{TmLambda}\;\Varid{s}\;\Varid{ty}\;\Varid{te})\mathrel{=}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\mathbf{do}\;\{\mskip1.5mu \Varid{env}\leftarrow \Varid{ask}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\phantom{\mathbf{do}\;\mbox{}};\Varid{return}\mathbin{\$}\Varid{\uparrow}\mathbin{\$}(\lambda \Varid{v}\to \mathbf{do}\;\{\mskip1.5mu \Varid{v'}\leftarrow \Varid{v}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\phantom{\mathbf{do}\;\mbox{}}\phantom{;\Varid{return}\mathbin{\$}\Varid{\uparrow}\mathbin{\$}(\lambda \Varid{v}\to \mathbf{do}\;\mbox{}};\Varid{local}\;(\Varid{const}\;((\Varid{s},\Varid{v'})\mathbin{:}\Varid{env}))\;\Varid{te}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\phantom{\mathbf{do}\;\mbox{}}\phantom{;\Varid{return}\mathbin{\$}\Varid{\uparrow}\mathbin{\$}(\lambda \Varid{v}\to \mathbf{do}\;\mbox{}}\mskip1.5mu\})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\phantom{\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\phi}\;(\Conid{TmApp}\;\Varid{te1}\;\Varid{te2})\mathrel{=}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\mathbf{do}\;\{\mskip1.5mu \Varid{te1'}\leftarrow \Varid{te1}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\phantom{\mathbf{do}\;\mbox{}};\mathbf{case}\;(\Varid{\downarrow}\;\Varid{te1'})\;\mathbf{of}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}(\Conid{Just}\;(\Conid{LambdaVal}\;\Varid{f}))\to (\Varid{f}\;\Varid{te2})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\Varid{a}\to \Varid{error}\;((\Varid{show}\;\Varid{a})\plus \text{\tt \char34 ~is~not~a~lambda~value\char34})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\Varid{\phi}\;\mbox{}}\phantom{\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$
+\end{tabbing}
+The \ensuremath{\Varid{eval}_{\mathcal D}} function generates a monad from a term language element.
+The monad is an \ensuremath{\Conid{ErrorMonad}} composed with a \ensuremath{\Conid{Reader}} monad, thus the
+result of applying \ensuremath{\Varid{runReader}} is either a value or an error message.
+\ensuremath{\Varid{runEval}} applies \ensuremath{\Varid{runReaderT}} to the \ensuremath{\Conid{Reader}} monad resulting from
+\ensuremath{\Varid{eval}_{\mathcal D}} on an environment parameter.  \ensuremath{\Varid{execute}} applies \ensuremath{\Varid{runEval}} with
+an empty environment.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\Varid{eval}_{\mathcal D}\mathbin{::}\Conid{TmLang}\to \Conid{TmValEnv}}$\\
+${\hskip1.00em\relax\Varid{eval}_{\mathcal D}\mathrel{=}\Varid{cata}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{runEval}\;\Varid{t}\;\Varid{e}\mathrel{=}(\Varid{runReaderT}\;(\Varid{eval}_{\mathcal D}\;\Varid{t})\;\Varid{e})}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{execute}\;\Varid{t}\mathrel{=}\Varid{runEval}\;\Varid{t}\;[\mskip1.5mu \mskip1.5mu]}$
+\end{tabbing}
+\section{Interpretation}
+
+Here the type checker and the evaluator are put together to form an
+interpreter.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{module}\;\Conid{TypedLambdaInterpreter}\;\mathbf{where}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{import}\;\Conid{LangUtils}}$\\
+${\hskip1.00em\relax\mathbf{import}\;\Conid{TypedLambdaEnv}}$\\
+${\hskip1.00em\relax\mathbf{import}\;\Conid{TypedLambdaAST}}$\\
+${\hskip1.00em\relax\mathbf{import}\;\Conid{TypedLambdaEval}}$\\
+${\hskip1.00em\relax\mathbf{import}\;\Conid{TypedLambdaTypesT}}$
+\end{tabbing}
+The \ensuremath{\Varid{interpret}} function is primarily a command line, testing
+function.  It accepts a term and generates an \ensuremath{\Conid{IO}} monad representing
+either the error message or value generated by the evaluator.  Most of
+the work here is simply getting the output in a reasonably well
+formatted form.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\Varid{interpret}\mathbin{::}\Conid{TmLang}\to \Conid{IO}\;()}$\\
+${\hskip1.00em\relax\Varid{interpret}\;\Varid{t}\mathrel{=}\mathbf{case}\;(\Varid{runTypeof}\;\Varid{t})\;\mathbf{of}}$\\
+${\hskip1.00em\relax\phantom{\Varid{interpret}\;\Varid{t}\mathrel{=}\mbox{}}(\Conid{Left}\;(\Conid{\Conid{TypedLambdaTypesT}.Err}\;\Varid{y}))\to }$\\
+${\hskip1.00em\relax\phantom{\Varid{interpret}\;\Varid{t}\mathrel{=}\mbox{}}\hskip2.00em\relax\mathbf{do}\;\{\mskip1.5mu \Varid{putStr}\;\text{\tt \char34 Type~Error:~\char34}}$\\
+${\hskip1.00em\relax\phantom{\Varid{interpret}\;\Varid{t}\mathrel{=}\mbox{}}\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{putStr}\;\Varid{y};\Varid{putStr}\;\text{\tt \char34 \char92 n\char34}}$\\
+${\hskip1.00em\relax\phantom{\Varid{interpret}\;\Varid{t}\mathrel{=}\mbox{}}\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$\\
+${\hskip1.00em\relax\phantom{\Varid{interpret}\;\Varid{t}\mathrel{=}\mbox{}}(\Conid{Right}\;\Varid{y})\to \mathbf{case}\;(\Varid{runEval}\;\Varid{t}\;[\mskip1.5mu \mskip1.5mu])\;\mathbf{of}}$\\
+${\hskip1.00em\relax\phantom{\Varid{interpret}\;\Varid{t}\mathrel{=}\mbox{}}\hskip6.00em\relax(\Conid{Left}\;(\Conid{\Conid{TypedLambdaEval}.Err}\;\Varid{z}))\to }$\\
+${\hskip1.00em\relax\phantom{\Varid{interpret}\;\Varid{t}\mathrel{=}\mbox{}}\hskip6.00em\relax\hskip2.00em\relax\mathbf{do}\;\{\mskip1.5mu \Varid{putStr}\;\text{\tt \char34 Runtime~Error:~\char34}}$\\
+${\hskip1.00em\relax\phantom{\Varid{interpret}\;\Varid{t}\mathrel{=}\mbox{}}\hskip6.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{putStr}\;(\Varid{show}\;\Varid{z})}$\\
+${\hskip1.00em\relax\phantom{\Varid{interpret}\;\Varid{t}\mathrel{=}\mbox{}}\hskip6.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{putStr}\;\text{\tt \char34 \char92 n\char34}}$\\
+${\hskip1.00em\relax\phantom{\Varid{interpret}\;\Varid{t}\mathrel{=}\mbox{}}\hskip6.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$\\
+${\hskip1.00em\relax\phantom{\Varid{interpret}\;\Varid{t}\mathrel{=}\mbox{}}\hskip6.00em\relax(\Conid{Right}\;\Varid{z})\to }$\\
+${\hskip1.00em\relax\phantom{\Varid{interpret}\;\Varid{t}\mathrel{=}\mbox{}}\hskip6.00em\relax\hskip2.00em\relax\mathbf{do}\;\{\mskip1.5mu \Varid{putStr}\;\text{\tt \char34 Value:~\char34}}$\\
+${\hskip1.00em\relax\phantom{\Varid{interpret}\;\Varid{t}\mathrel{=}\mbox{}}\hskip6.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{putStr}\;(\Varid{show}\;\Varid{z})}$\\
+${\hskip1.00em\relax\phantom{\Varid{interpret}\;\Varid{t}\mathrel{=}\mbox{}}\hskip6.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{putStr}\;\text{\tt \char34 ::~\char34}}$\\
+${\hskip1.00em\relax\phantom{\Varid{interpret}\;\Varid{t}\mathrel{=}\mbox{}}\hskip6.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{putStr}\;(\Varid{show}\;\Varid{y})}$\\
+${\hskip1.00em\relax\phantom{\Varid{interpret}\;\Varid{t}\mathrel{=}\mbox{}}\hskip6.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{putStr}\;\text{\tt \char34 \char92 n\char34}}$\\
+${\hskip1.00em\relax\phantom{\Varid{interpret}\;\Varid{t}\mathrel{=}\mbox{}}\hskip6.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$
+\end{tabbing}
+\bibliography{prog-langs}
+
+\end{document}

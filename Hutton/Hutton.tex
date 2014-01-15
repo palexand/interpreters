@@ -1,0 +1,674 @@
+\documentclass[10pt]{article}
+
+%% ODER: format ==         = "\mathrel{==}"
+%% ODER: format /=         = "\neq "
+\makeatletter
+
+\usepackage{amstext}
+\usepackage{amssymb}
+\usepackage{stmaryrd}
+\DeclareFontFamily{OT1}{cmtex}{}
+\DeclareFontShape{OT1}{cmtex}{m}{n}
+  {<5><6><7><8>cmtex8
+   <9>cmtex9
+   <10><10.95><12><14.4><17.28><20.74><24.88>cmtex10}{}
+\DeclareFontShape{OT1}{cmtex}{m}{it}
+  {<-> ssub * cmtt/m/it}{}
+\newcommand{\texfamily}{\fontfamily{cmtex}\selectfont}
+\DeclareFontShape{OT1}{cmtt}{bx}{n}
+  {<5><6><7><8>cmtt8
+   <9>cmbtt9
+   <10><10.95><12><14.4><17.28><20.74><24.88>cmbtt10}{}
+\DeclareFontShape{OT1}{cmtex}{bx}{n}
+  {<-> ssub * cmtt/bx/n}{}
+\newcommand{\tex}[1]{\text{\texfamily#1}}	% NEU
+
+\newcommand{\Sp}{\hskip.33334em\relax}
+
+\newlength{\lwidth}\setlength{\lwidth}{4.5cm}
+\newlength{\cwidth}\setlength{\cwidth}{8mm} % 3mm
+
+\newcommand{\Conid}[1]{\mathit{#1}}
+\newcommand{\Varid}[1]{\mathit{#1}}
+\newcommand{\anonymous}{\kern0.06em \vbox{\hrule\@width.5em}}
+\newcommand{\plus}{\mathbin{+\!\!\!+}}
+\newcommand{\bind}{\mathbin{>\!\!\!>\mkern-6.7mu=}}
+\newcommand{\sequ}{\mathbin{>\!\!\!>}}
+\renewcommand{\leq}{\leqslant}
+\renewcommand{\geq}{\geqslant}
+\newcommand{\NB}{\textbf{NB}}
+\newcommand{\Todo}[1]{$\langle$\textbf{To do:}~#1$\rangle$}
+
+\makeatother
+
+\usepackage{fullpage}
+\usepackage{alltt}
+
+\bibliographystyle{plain}
+
+\parskip=\medskipamount
+\parindent=0pt
+
+\title{A Haskell Companion for ``Fold and Unfold for Program Semantics''}
+\author{\emph{Uk'taad B'mal} \\
+  The University of Kansas - ITTC \\
+  2335 Irving Hill Rd, Lawrence, KS 66045 \\
+  \texttt{lambda@ittc.ku.edu}}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+
+  This document is a primer to accompany the paper ``Fold and Unfold
+  for Program Semantics'' by Graham Hutton.  It attempts to
+  re-implement in \texttt{Haskell} the interpreters written in
+  \texttt{Gopher}.
+
+\end{abstract}
+
+\section{Introduction}
+
+\section{Fold For Expressions}
+
+Module \ensuremath{\Conid{FoldForExpressions}} presents a Haskell encoding of
+Hutton's interpreter and definition of fold over expressions:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{module}\;\Conid{FoldForExpressions}\;\mathbf{where}}$
+\end{tabbing}
+First, we define data structures for \ensuremath{\Conid{Expr}} representing numbers and
+addition.  This is a parameterized version of the expression data type
+defined in the Duponcheel interpreters:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;(\Conid{Show}\;\Varid{a},\Conid{Eq}\;\Varid{a})\Rightarrow \Conid{Expr}\;\Varid{a}}$\\
+${\hskip2.00em\relax\mathrel{=}\Conid{Val}\;\Varid{a}}$\\
+${\hskip2.00em\relax\mid \Conid{Add}\;(\Conid{Expr}\;\Varid{a})\;(\Conid{Expr}\;\Varid{a})}$\\
+${\hskip2.00em\relax\phantom{\mid \mbox{}}\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$
+\end{tabbing}
+It's easy now to define direct evaluation of the expression data
+structure using direct recursion.  Note that \ensuremath{\Conid{Expr}} is instantiated
+over \ensuremath{\Conid{Int}} in this evaluator:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{eval}_1\mathbin{::}\Conid{Expr}\;\Conid{Int}\to \Conid{Int}}$\\
+${\Varid{eval}_1\;(\Conid{Val}\;\Varid{n})\mathrel{=}\Varid{n}}$\\
+${\Varid{eval}_1\;(\Conid{Add}\;\Varid{x}\;\Varid{y})\mathrel{=}\Varid{eval}_1\;\Varid{x}\mathbin{+}\Varid{eval}_1\;\Varid{y}}$
+\end{tabbing}
+The function \ensuremath{\Varid{\phi}} is actually defined as \ensuremath{\Varid{deno}} in the Hutton paper.
+I have used \ensuremath{\Varid{\phi}} to be consistent with Duponcheel.  The functions
+\ensuremath{\Varid{f}} and \ensuremath{\Varid{g}} provide the semantics for \ensuremath{\Conid{Val}} and \ensuremath{\Conid{Add}}.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{f}\mathrel{=}\Varid{id}}$\\
+${\Varid{g}\mathrel{=}(\mathbin{+})}$\\
+${}$\\
+${\Varid{\phi}\;(\Conid{Val}\;\Varid{n})\mathrel{=}\Varid{f}\;\Varid{n}}$\\
+${\Varid{\phi}\;(\Conid{Add}\;\Varid{x}\;\Varid{y})\mathrel{=}\Varid{g}\;(\Varid{\phi}\;\Varid{x})\;(\Varid{\phi}\;\Varid{y})}$
+\end{tabbing}
+The \ensuremath{\Varid{fold}} operation defines a general fold function over expressions.
+The signature of the fold is interesting.  So much so that I let
+\texttt{Haskell}'s type inference system find it for me.  \ensuremath{\Varid{a}} reflects
+the type of the value encapsulated by \ensuremath{\Conid{Val}\;\Varid{a}} while \ensuremath{\Varid{b}} reflects the
+domain of what will be the evaluation function.  Specifically, \ensuremath{\Varid{a}\to \Varid{b}}
+defines the signature of the value extraction function.  For \ensuremath{\Varid{eval}_2},
+that function is \ensuremath{\Varid{id}} because we are simply extracting the value.  For
+\ensuremath{\Varid{comp}} later, it will be \ensuremath{\Conid{Inst}}, the instruction generated for the
+stack machine.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{fold}\mathbin{::}(\Conid{Eq}\;\Varid{a},\Conid{Show}\;\Varid{a})\Rightarrow (\Varid{a}\to \Varid{b})\to (\Varid{b}\to \Varid{b}\to \Varid{b})\to \Conid{Expr}\;\Varid{a}\to \Varid{b}}$\\
+${\Varid{fold}\;\Varid{f}\;\Varid{g}\;(\Conid{Val}\;\Varid{n})\mathrel{=}\Varid{f}\;\Varid{n}}$\\
+${\Varid{fold}\;\Varid{f}\;\Varid{g}\;(\Conid{Add}\;\Varid{x}\;\Varid{y})\mathrel{=}\Varid{g}\;(\Varid{fold}\;\Varid{f}\;\Varid{g}\;\Varid{x})\;(\Varid{fold}\;\Varid{f}\;\Varid{g}\;\Varid{y})}$
+\end{tabbing}
+The evaluation function, \ensuremath{\Varid{eval}_1}, defined earlier can now be redefined
+using \ensuremath{\Varid{fold}} and specifying the semantic mappings for \ensuremath{\Conid{Val}} and \ensuremath{\Conid{Add}}
+respectively.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{eval}_2\mathrel{=}\Varid{fold}\;\Varid{id}\;(\mathbin{+})}$
+\end{tabbing}
+Hutton also defines a compiler function, \ensuremath{\Varid{comp}}, that generates a
+sequence of instructions for a stack machine.  \ensuremath{\Conid{Inst}} is a data type
+representing possible instructions for the machine.  
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{Inst}\mathrel{=}\Conid{PUSH}\;\Conid{Int}\mid \Conid{ADD}\;\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$
+\end{tabbing}
+\ensuremath{\Varid{comp}} translates an expression defined over integers into a list of
+instructions.  When looking at the \ensuremath{\Varid{fold}}, \ensuremath{\Varid{a}} is instantiated with
+\ensuremath{\Conid{Expr}\;\Conid{Int}} while \ensuremath{\Varid{b}} is instantiated with \ensuremath{[\mskip1.5mu \Conid{Inst}\mskip1.5mu]}.  Initially, I was
+confused with the definition of \ensuremath{\Varid{g}}.  The fold will actually evaluate
+the arguments to \ensuremath{\Conid{Add}} and return them.  It thus makes sense that \ensuremath{\Varid{g}}
+simply concatenates the lists of instructions and tacks an \ensuremath{\Conid{ADD}} onto
+the end.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{comp}\mathbin{::}\Conid{Expr}\;\Conid{Int}\to [\mskip1.5mu \Conid{Inst}\mskip1.5mu]}$\\
+${\Varid{comp}\mathrel{=}\Varid{fold}\;\Varid{f}\;\Varid{g}}$\\
+${\phantom{\Varid{comp}\mathrel{=}\mbox{}}\mathbf{where}}$\\
+${\phantom{\Varid{comp}\mathrel{=}\mbox{}}\hskip1.00em\relax\Varid{f}\;\Varid{n}\mathrel{=}[\mskip1.5mu \Conid{PUSH}\;\Varid{n}\mskip1.5mu]}$\\
+${\phantom{\Varid{comp}\mathrel{=}\mbox{}}\hskip1.00em\relax\Varid{g}\;\Varid{xs}\;\Varid{ys}\mathrel{=}\Varid{xs}\plus \Varid{ys}\plus [\mskip1.5mu \Conid{ADD}\mskip1.5mu]}$
+\end{tabbing}
+Hutton extends \ensuremath{\Varid{eval}_2} to include variables and a program store.  I'm
+going to extend \ensuremath{\Varid{eval}_2} like I did for Duponcheel by adding a multiply
+operation.  It's not particularly difficult, however it becomes clear
+that the interpreter is not particularly modular or extensible.
+
+First, we need to extend the expression data structure to include the multiplication operation:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;(\Conid{Show}\;\Varid{a},\Conid{Eq}\;\Varid{a})\Rightarrow \Varid{Expr}_1\;\Varid{a}}$\\
+${\hskip2.00em\relax\mathrel{=}\Conid{Val1}\;\Varid{a}}$\\
+${\hskip2.00em\relax\mid \Conid{Add1}\;(\Varid{Expr}_1\;\Varid{a})\;(\Varid{Expr}_1\;\Varid{a})}$\\
+${\hskip2.00em\relax\mid \Conid{Mul1}\;(\Varid{Expr}_1\;\Varid{a})\;(\Varid{Expr}_1\;\Varid{a})}$\\
+${\hskip2.00em\relax\phantom{\mid \mbox{}}\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$
+\end{tabbing}
+Then we have to redefine \ensuremath{\Varid{fold}} as \ensuremath{\Varid{fold1}} to take three functions to
+include the semantics for multiply:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{fold1}\mathbin{::}(\Conid{Show}\;\Varid{a},\Conid{Eq}\;\Varid{a})\Rightarrow (\Varid{a}\to \Varid{b})\to (\Varid{b}\to \Varid{b}\to \Varid{b})\to (\Varid{b}\to \Varid{b}\to \Varid{b})\to \Varid{Expr}_1\;\Varid{a}\to \Varid{b}}$\\
+${\Varid{fold1}\;\Varid{f}\;\Varid{g}\;\Varid{h}\;(\Conid{Val1}\;\Varid{x})\mathrel{=}\Varid{f}\;\Varid{x}}$\\
+${\Varid{fold1}\;\Varid{f}\;\Varid{g}\;\Varid{h}\;(\Conid{Add1}\;\Varid{x}\;\Varid{y})\mathrel{=}\Varid{g}\;(\Varid{fold1}\;\Varid{f}\;\Varid{g}\;\Varid{h}\;\Varid{x})\;(\Varid{fold1}\;\Varid{f}\;\Varid{g}\;\Varid{h}\;\Varid{y})}$\\
+${\Varid{fold1}\;\Varid{f}\;\Varid{g}\;\Varid{h}\;(\Conid{Mul1}\;\Varid{x}\;\Varid{y})\mathrel{=}\Varid{h}\;(\Varid{fold1}\;\Varid{f}\;\Varid{g}\;\Varid{h}\;\Varid{x})\;(\Varid{fold1}\;\Varid{f}\;\Varid{g}\;\Varid{h}\;\Varid{y})}$
+\end{tabbing}
+Now we can define \ensuremath{\Varid{eval}_3} to perform the appropriate evaluation:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{eval}_3\mathrel{=}\Varid{fold1}\;\Varid{id}\;(\mathbin{+})\;(\mathbin{*})}$
+\end{tabbing}
+Hutton continues to generize the evaluation function by adding a
+\ensuremath{\Conid{Store}} and variable access to the interpetation.  He does not provide
+a full definition for \ensuremath{\Conid{Store}}, so we'll try to here.  First we define
+a new \ensuremath{\Conid{Expr}} type that includes the concept of a variable:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Varid{Expr}_2\;\Varid{ty}}$\\
+${\hskip2.00em\relax\mathrel{=}\Conid{Val2}\;\Varid{ty}}$\\
+${\hskip2.00em\relax\mid \Conid{Add2}\;(\Varid{Expr}_2\;\Varid{ty})\;(\Varid{Expr}_2\;\Varid{ty})}$\\
+${\hskip2.00em\relax\mid \Conid{Var2}\;\Conid{String}}$
+\end{tabbing}
+Note that the \ensuremath{\Varid{Expr}_2} type is parameterized over the contained data,
+\ensuremath{\Varid{n}}, and the variable name type, \ensuremath{\Varid{v}}.  This will allow the most
+general possible \ensuremath{\Conid{Store}} to be defined.
+
+Next, we define a new \ensuremath{\Varid{fold}} that includes the processing of variable
+references.  \ensuremath{\Varid{h}} now provides a lookup capability for variables in the
+store.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{fold2}\;\Varid{f}\;\Varid{g}\;\Varid{h}\;(\Conid{Val2}\;\Varid{x})\mathrel{=}\Varid{f}\;\Varid{x}}$\\
+${\Varid{fold2}\;\Varid{f}\;\Varid{g}\;\Varid{h}\;(\Conid{Add2}\;\Varid{x}\;\Varid{y})\mathrel{=}\Varid{g}\;(\Varid{fold2}\;\Varid{f}\;\Varid{g}\;\Varid{h}\;\Varid{x})\;(\Varid{fold2}\;\Varid{f}\;\Varid{g}\;\Varid{h}\;\Varid{y})}$\\
+${\Varid{fold2}\;\Varid{f}\;\Varid{g}\;\Varid{h}\;(\Conid{Var2}\;\Varid{c})\mathrel{=}\Varid{h}\;\Varid{c}}$
+\end{tabbing}
+We still need a \ensuremath{\Conid{Store}} and \ensuremath{\Varid{find}} function for records in the store.
+The easiest \ensuremath{\Conid{Store}} to define is a list of pairs whose first element
+is a \ensuremath{\Conid{String}} and whose second is a value:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{Binding}\;\Varid{n}\mathrel{=}\Conid{Binding}\;\Conid{String}\;\Varid{n}}$\\
+${}$\\
+${\mathbf{type}\;\Conid{Store}\mathrel{=}[\mskip1.5mu (\Conid{Binding}\;\Conid{Int})\mskip1.5mu]}$\\
+${}$\\
+${\Varid{find}\mathbin{::}\Conid{String}\to \Conid{Store}\to \Conid{Int}}$\\
+${\Varid{find}\;\Varid{v}\;[\mskip1.5mu \mskip1.5mu]\mathrel{=}\Varid{error}\;(\text{\tt \char34 Variable~\char34}\plus \Varid{v}\plus \text{\tt \char34 ~not~found~in~store\char34})}$\\
+${\Varid{find}\;\Varid{n1}\;((\Conid{Binding}\;\Varid{n2}\;\Varid{z})\mathbin{:}\Varid{bs})\mathrel{=}\mathbf{if}\;(\Varid{n1}\equiv \Varid{n2})\;\mathbf{then}\;\Varid{z}\;\mathbf{else}\;\Varid{find}\;\Varid{n1}\;\Varid{bs}}$
+\end{tabbing}
+Now we can write the \ensuremath{\Varid{eval}} function over this new data structure with
+an associated store like Hutton:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{evalS}\mathbin{::}(\Varid{Expr}_2\;\Conid{Int})\to (\Conid{Store}\to \Conid{Int})}$\\
+${\Varid{evalS}\mathrel{=}\Varid{fold2}\;\Varid{f}\;\Varid{g}\;\Varid{h}}$\\
+${\phantom{\Varid{evalS}\mathrel{=}\mbox{}}\mathbf{where}}$\\
+${\phantom{\Varid{evalS}\mathrel{=}\mbox{}}\hskip1.50em\relax\Varid{f}\;\Varid{n}\mathrel{=}\lambda \Varid{s}\to \Varid{n}}$\\
+${\phantom{\Varid{evalS}\mathrel{=}\mbox{}}\hskip1.50em\relax\Varid{g}\;\Varid{fx}\;\Varid{fy}\mathrel{=}\lambda \Varid{s}\to \Varid{fx}\;\Varid{s}\mathbin{+}\Varid{fy}\;\Varid{s}}$\\
+${\phantom{\Varid{evalS}\mathrel{=}\mbox{}}\hskip1.50em\relax\Varid{h}\;\Varid{n}\mathrel{=}\lambda \Varid{s}\to \Varid{find}\;\Varid{n}\;\Varid{s}}$
+\end{tabbing}
+This function maps an expression to a function mapping \ensuremath{\Conid{Store}} to
+\ensuremath{\Conid{Int}} rather than just an \ensuremath{\Conid{Int}}.  We must in effect provide a \ensuremath{\Conid{Store}}
+to perform a full evaluation.  However, that \ensuremath{\Conid{Store}} is not mutable -
+there is no mechanism for adding to or deleting from the \ensuremath{\Conid{Store}}.
+
+Some interesting examples:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{testS}\mathrel{=}(\Conid{Add2}\;(\Conid{Var2}\;\text{\tt \char34 Test\char34})\;(\Conid{Var2}\;\text{\tt \char34 x\char34}))}$\\
+${\Varid{failS}\mathrel{=}(\Conid{Add2}\;(\Conid{Var2}\;\text{\tt \char34 test\char34})\;(\Conid{Var2}\;\text{\tt \char34 x\char34}))}$\\
+${\Varid{storeS}\mathbin{::}\Conid{Store}\mathrel{=}[\mskip1.5mu (\Conid{Binding}\;\text{\tt \char34 Test\char34}\;\mathrm{3}),(\Conid{Binding}\;\text{\tt \char34 x\char34}\;\mathrm{4})\mskip1.5mu]}$
+\end{tabbing}
+You can now enter the following at the command line to see what's going on:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{evalS}\;\Varid{storeS}\;\Varid{testS}}$\\
+${}$\\
+${\Varid{evalS}\;\Varid{storeS}\;\Varid{failS}}$
+\end{tabbing}
+This is interesting from a semantics definition perspective.  However,
+it is not a particularly useful way to define modular interpreters as
+Duponcheel does.
+
+One question is whether the \ensuremath{\Conid{Sum}} type used buy Duponcheel to form
+composite data types and composite application functions.  Hutton's
+approach uses the position of the folded function in the argument list
+to determine which function to apply.  Duponcheel defines a function
+composition operation over the \ensuremath{\Conid{Sum}} type to accomplish a similar task.
+
+First, define new data types for each element of the expression:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Varid{Expr}_2\;\Varid{a}\mathrel{=}\Conid{Val2}\;\Varid{a}}$\\
+${\mathbf{data}\;\Varid{Expr}_3\;\Varid{a}\mathrel{=}\Conid{Add2}\;\Varid{a}\;\Varid{a}}$
+\end{tabbing}
+Now reproduce the \ensuremath{\Conid{Sum}} definition from Duponcheel:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{Sum}\;\Varid{a}\;\Varid{b}}$\\
+${\hskip2.00em\relax\mathrel{=}\Conid{L}\;\Varid{a}}$\\
+${\hskip2.00em\relax\phantom{\mathrel{=}\mbox{}}\Conid{R}\;\Varid{b}}$\\
+${}$\\
+${(\mathbin{<+>})\mathbin{::}(\Varid{x}\to \Varid{z})\to (\Varid{y}\to \Varid{z})\to ((\Conid{Sum}\;\Varid{x}\;\Varid{y})\to \Varid{z})}$\\
+${\Varid{f}\mathbin{<+>}\Varid{g}\mathrel{=}\Varid{s}\to \mathbf{case}\;\Varid{s}\;\mathbf{of}}$\\
+${\hskip11.50em\relax(\Conid{L}\;\Varid{x})\to \Varid{f}\;\Varid{x}}$\\
+${\hskip11.50em\relax(\Conid{R}\;\Varid{x})\to \Varid{g}\;\Varid{x}}$
+\end{tabbing}
+Now define a \ensuremath{\Conid{Term}} type to represent both possible term elements:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{type}\;\Conid{Term}\mathrel{=}\Conid{Sum}\;(\Varid{Expr}_2\;\Conid{Int})\;(\Varid{Expr}_3\;\Conid{Int})}$
+\end{tabbing}
+Finally, define a mapping function from the composite of the \ensuremath{\Varid{id}} and
+\ensuremath{(\mathbin{+})} operations:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{j}\mathrel{=}\Varid{id}\mathbin{<+>}(\mathbin{+})}$
+\end{tabbing}
+If all goes well, we should be able to fold \ensuremath{\Varid{j}} through the structure.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{fold2}\;\Varid{j}\;(\Conid{L}\;(\Conid{Val2}\;\Varid{x}))\mathrel{=}\Varid{j}\;\Varid{x}}$\\
+${\Varid{fold2}\;\Varid{j}\;(\Conid{R}\;(\Conid{Add2}\;\Varid{x}\;\Varid{y}))\mathrel{=}\Varid{j}\;(\Varid{fold2}\;\Varid{j}\;\Varid{x})\;(\Varid{fold2}\;\Varid{j}\;\Varid{y})}$
+\end{tabbing}
+But all doesn't go well.  The problem is that the arity of \ensuremath{\Varid{j}} is
+fixed.  Thus, there is no way to apply it to both \ensuremath{\Varid{x}} in the first
+case and the results of \ensuremath{\Varid{fold2}} applied twice in the second case.
+What's happening here is actually pretty simple.  Hutton's fold
+semantics unpackages the arguments to \ensuremath{\Conid{Add2}} before applying \ensuremath{\Conid{Fold2}}.
+This explains why: (i) the signature for \ensuremath{\Varid{g}} above maps two elements
+of the type \emph{encapsulated by} \ensuremath{\Conid{Val}} to an element of the same
+type rather than two elements of the \ensuremath{\Conid{Expr}}; and (ii) why the function
+composition cannot be applied in the same way.  It would be
+interesting to attempt to rewrite the fold to achieve this end.
+\section{Unfold For Expressions}
+
+Module \ensuremath{\Conid{UnfoldForExpressions}} presents a Haskell encoding of
+Hutton's interpreter and definition of fold over expressions:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{module}\;\Conid{UnfoldForExpressions}\;\mathbf{where}}$
+\end{tabbing}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;(\Conid{Show}\;\Varid{a},\Conid{Eq}\;\Varid{a})\Rightarrow \Conid{Expr}\;\Varid{a}}$\\
+${\hskip2.00em\relax\mathrel{=}\Conid{Val}\;\Varid{a}}$\\
+${\hskip2.00em\relax\mid \Conid{Add}\;(\Conid{Expr}\;\Varid{a})\;(\Conid{Expr}\;\Varid{a})}$\\
+${\hskip2.00em\relax\phantom{\mid \mbox{}}\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$
+\end{tabbing}
+The translation function is interesting as it almost directly
+implements the operational semantics rules defined for expressions and
+exhibits why it is an unfold.  What \ensuremath{\Varid{trans}} does is takes an
+expression and generates a list of possible transformations of that
+expression.  Because the semantics of \ensuremath{\Conid{Add}} don't specify whether the
+first or second argument is evaluated first, there are two possible
+paths.  Thus, \ensuremath{\Varid{trans}} is effectively a one-step unfold.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{trans}\mathbin{::}\Conid{Expr}\;\Conid{Int}\to [\mskip1.5mu \Conid{Expr}\;\Conid{Int}\mskip1.5mu]}$\\
+${\Varid{trans}\;(\Conid{Val}\;\Varid{n})\mathrel{=}[\mskip1.5mu \mskip1.5mu]}$\\
+${\Varid{trans}\;(\Conid{Add}\;(\Conid{Val}\;\Varid{n})\;(\Conid{Val}\;\Varid{m}))\mathrel{=}[\mskip1.5mu \Conid{Val}\;(\Varid{n}\mathbin{+}\Varid{m})\mskip1.5mu]}$\\
+${\Varid{trans}\;(\Conid{Add}\;\Varid{x}\;\Varid{y})}$\\
+${\phantom{\Varid{trans}\;\mbox{}}\mathrel{=}[\mskip1.5mu \Conid{Add}\;\Varid{x'}\;\Varid{y}\mid \Varid{x'}\leftarrow \Varid{trans}\;\Varid{x}\mskip1.5mu]\plus }$\\
+${\phantom{\Varid{trans}\;\mbox{}}\phantom{\mathrel{=}\mbox{}}[\mskip1.5mu \Conid{Add}\;\Varid{x}\;\Varid{y'}\mid \Varid{y'}\leftarrow \Varid{trans}\;\Varid{y}\mskip1.5mu]}$
+\end{tabbing}
+Hutton now defines \ensuremath{\Varid{exec}} as a function that applies \ensuremath{\Varid{trans}}
+repeatedly until nothing remains to be translated.  The result is a
+tree whose nodes are the results of applying \ensuremath{\Varid{trans}} to their
+immediate predecessor in the tree.  So, each list generated by \ensuremath{\Varid{trans}}
+is treated as the data associated with a set of sub-nodes.  To
+represent this, we'll generate a tree.  First, define a data type for
+a tree with arbitrary subtrees:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{Tree}\;\Varid{a}\mathrel{=}\Conid{Node}\;\Varid{a}\;[\mskip1.5mu \Conid{Tree}\;\Varid{a}\mskip1.5mu]\;\mathbf{deriving}\;\Conid{Show}}$
+\end{tabbing}
+Now \ensuremath{\Varid{exec}} can be defined recursively using list comprehension.
+Executing \ensuremath{\Varid{e}} is \ensuremath{\Varid{e}} itself in a node with the possible translations
+of \ensuremath{\Varid{e}}.  Because \ensuremath{\Varid{exec}} is referenced recursively in the list
+comprehension, it will be applied to the results of each application
+of \ensuremath{\Varid{trans}}.  This is a very powerful and interesting application of
+\texttt{Haskell}'s list comprehension operator!
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{exec}\mathbin{::}\Conid{Expr}\;\Conid{Int}\to \Conid{Tree}\;(\Conid{Expr}\;\Conid{Int})}$\\
+${\Varid{exec}\;\Varid{e}\mathrel{=}\Conid{Node}\;\Varid{e}\;[\mskip1.5mu \Varid{exec}\;\Varid{e'}\mid \Varid{e'}\leftarrow \Varid{trans}\;\Varid{e}\mskip1.5mu]}$
+\end{tabbing}
+Hutton abstracts from the case for \ensuremath{\Varid{exec}} by defining a function,
+\ensuremath{\Varid{oper}}, that defines the operational semantics for a tree structure
+using arbitrary functions for \ensuremath{\Varid{id}} and \ensuremath{\Varid{trans}} as they appear in
+\ensuremath{\Varid{exec}}.  Note that \ensuremath{\Varid{id}} does not explicitly appear, but is implicitly
+called on the input argument.  \ensuremath{\Varid{oper}} as defined in Hutton will not
+typecheck because \ensuremath{\Varid{f}} and \ensuremath{\Varid{g}} are free.  Here is a definition for
+\ensuremath{\Varid{oper}} that will type check and function appropriately:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{oper}\;\Varid{f}\;\Varid{g}\;\Varid{x}\mathrel{=}\Conid{Node}\;(\Varid{f}\;\Varid{x})\;[\mskip1.5mu \Varid{oper}\;\Varid{f}\;\Varid{g}\;\Varid{x'}\mid \Varid{x'}\leftarrow \Varid{g}\;\Varid{x}\mskip1.5mu]}$
+\end{tabbing}
+If we replace \ensuremath{\Varid{oper}} with \ensuremath{\Varid{unfold}}, we get a general unfold operation for
+trees of any type:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{unfold}\;\Varid{f}\;\Varid{g}\;\Varid{x}\mathrel{=}\Conid{Node}\;(\Varid{f}\;\Varid{x})\;[\mskip1.5mu \Varid{unfold}\;\Varid{f}\;\Varid{g}\;\Varid{x'}\mid \Varid{x'}\leftarrow \Varid{g}\;\Varid{x}\mskip1.5mu]}$
+\end{tabbing}
+and we an redefine \ensuremath{\Varid{oper}} as \ensuremath{\Varid{oper1}}:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{oper1}\mathrel{=}\Varid{unfold}\;\Varid{id}\;\Varid{trans}}$
+\end{tabbing}
+Following are some test cases for \ensuremath{\Varid{trans}}, \ensuremath{\Varid{eval}}, \ensuremath{\Varid{oper}} and \ensuremath{\Varid{oper1}}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{test}_0\mathbin{::}\Conid{Expr}\;\Conid{Int}}$\\
+${\Varid{test}_0\mathrel{=}(\Conid{Add}\;(\Conid{Val}\;\mathrm{1})\;(\Conid{Val}\;\mathrm{2}))}$\\
+${\Varid{test}_1\mathbin{::}\Conid{Expr}\;\Conid{Int}}$\\
+${\Varid{test}_1\mathrel{=}(\Conid{Add}\;(\Conid{Add}\;(\Conid{Val}\;\mathrm{1})\;(\Conid{Val}\;\mathrm{2}))\;(\Conid{Val}\;\mathrm{3}))}$\\
+${\Varid{test}_2\mathbin{::}\Conid{Expr}\;\Conid{Int}}$\\
+${\Varid{test}_2\mathrel{=}(\Conid{Add}\;(\Conid{Add}\;(\Conid{Val}\;\mathrm{1})\;(\Conid{Val}\;\mathrm{2}))\;(\Conid{Add}\;(\Conid{Val}\;\mathrm{3})\;(\Conid{Val}\;\mathrm{4})))}$
+\end{tabbing}
+\section{Functors, Algebras and Catamorphsisms}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{module}\;\Conid{Cata}\;\mathbf{where}}$
+\end{tabbing}
+The catamorphism and fold depend on the definition of the standard
+datatype least fixpoint.  \ensuremath{\Conid{Fix}} type defines a template for fixed
+point data tyeps.  Note that the \ensuremath{\Conid{In}} constructor is required by
+\texttt{Haskell} to create instances of \ensuremath{\Conid{Fix}}.  The \ensuremath{\Varid{out}} function is
+effectively the opposite of the \ensuremath{\Conid{In}} constructor and pulls the
+encapsulated data structure out of the constructor.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{newtype}\;\Conid{Fix}\;\Varid{f}\mathrel{=}\Conid{In}\;(\Varid{f}\;(\Conid{Fix}\;\Varid{f}))}$\\
+${}$\\
+${\Varid{out}\mathbin{::}\Conid{Fix}\;\Varid{f}\to \Varid{f}\;(\Conid{Fix}\;\Varid{f})}$\\
+${\Varid{out}\;(\Conid{In}\;\Varid{x})\mathrel{=}\Varid{x}}$
+\end{tabbing}
+Now we add the Algebra and Co-Algebraic notation. The original type
+for fold:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{fold}\mathbin{::}(\Conid{Functor}\;\Varid{f})\Rightarrow (\Varid{f}\;\Varid{a}\to \Varid{a})\to \Conid{Fix}\;\Varid{f}\to \Varid{a}}$
+\end{tabbing}
+becomes:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{fold}\mathbin{::}(\Conid{Functor}\;\Varid{f})\Rightarrow (\Conid{Algebra}\;\Varid{f}\;\Varid{a})\to \Conid{Fix}\;\Varid{f}\to \Varid{a}}$
+\end{tabbing}
+using the type classes \ensuremath{\Conid{Functor}} and \ensuremath{\Conid{Algebra}}.  Even simpler, we can
+use the (Co)AlgebraConstructor class:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{pCata}\mathbin{::}(\Conid{AlgebraConstructor}\;\Varid{f}\;\Varid{a})\Rightarrow \Conid{Fix}\;\Varid{f}\to \Varid{a}}$\\
+${\Varid{pCata}\mathrel{=}\Varid{\phi}\mathbin{\circ}\Varid{fmap}\;\Varid{pCata}\mathbin{\circ}\Varid{out}}$
+\end{tabbing}
+Informally, we can define \ensuremath{\Varid{pCata}} as:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{pCata}\equiv \Varid{polytypic}\;\Conid{Catamorphism}}$
+\end{tabbing}
+Note the strong similarity between the polymorphic Catamorphism and
+the polymorphic fold, just above.  \ensuremath{\Varid{fold}} \emph{asks for} function
+\ensuremath{\Varid{\phi}\;(\Conid{F}\;\Varid{a}\to \Varid{a})} as an argument while \ensuremath{\Varid{pCata}} \emph{knows} \ensuremath{\Varid{\phi}}.
+
+We now take these concepts and encode them as \texttt{Haskell} type
+classes and types.  First, define \ensuremath{\Conid{Algebra}}, \ensuremath{\Conid{CoAlgebra}},
+\ensuremath{\Conid{AlgebraConstructor}} and \ensuremath{\Conid{CoAlgebraConstructor}}:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{type}\;\Conid{Algebra}\;\Varid{f}\;\Varid{a}\mathrel{=}\Varid{f}\;\Varid{a}\to \Varid{a}}$\\
+${\mathbf{type}\;\Conid{CoAlgebra}\;\Varid{f}\;\Varid{a}\mathrel{=}\Varid{a}\to \Varid{f}\;\Varid{a}}$\\
+${}$\\
+${\mathbf{class}\;\Conid{Functor}\;\Varid{f}\Rightarrow \Conid{AlgebraConstructor}\;\Varid{f}\;\Varid{a}}$\\
+${\hskip2.00em\relax\mathbf{where}\;\Varid{\phi}\mathbin{::}\Conid{Algebra}\;\Varid{f}\;\Varid{a}}$\\
+${}$\\
+${\mathbf{class}\;\Conid{Functor}\;\Varid{f}\Rightarrow \Conid{CoAlgebraConstructor}\;\Varid{f}\;\Varid{a}}$\\
+${\hskip2.00em\relax\mathbf{where}\;\Varid{psi}\mathbin{::}\Conid{CoAlgebra}\;\Varid{f}\;\Varid{a}}$
+\end{tabbing}
+We now redefine \ensuremath{\Varid{fold}} using \ensuremath{\Conid{Functor}} and \ensuremath{\Conid{Algebra}}.  This is very
+similar to Duponcheel.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mbox{\qquad-{}-  fold :: (Functor f) => (f a -> a) -> Fix f -> a}}$\\
+${\Varid{fold}\mathbin{::}(\Conid{Functor}\;\Varid{f})\Rightarrow (\Conid{Algebra}\;\Varid{f}\;\Varid{a})\to \Conid{Fix}\;\Varid{f}\to \Varid{a}}$\\
+${\Varid{fold}\;\Varid{g}\mathrel{=}\Varid{g}\mathbin{\circ}\Varid{fmap}\;(\Varid{fold}\;\Varid{g})\mathbin{\circ}\Varid{out}}$
+\end{tabbing}
+We can similarly define \ensuremath{\Varid{pCata}} using the \ensuremath{\Conid{AlgebraConstructor}} type class:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{pCata}\mathbin{::}(\Conid{AlgebraConstructor}\;\Varid{f}\;\Varid{a})\Rightarrow \Conid{Fix}\;\Varid{f}\to \Varid{a}}$\\
+${\Varid{pCata}\mathrel{=}\Varid{\phi}\mathbin{\circ}\Varid{fmap}\;\Varid{pCata}\mathbin{\circ}\Varid{out}}$
+\end{tabbing}
+Finally, we re-define the denotational semantics for the simple
+expression language that we began with in \texttt{FoldUnfold.lhs}
+using, \ensuremath{\Conid{Algebra}}, datatype fixpoint and polytypic fold.  Note that it
+is a little more complex because we carefully maintained generality
+over the specific numeric type used for constant values. The type,
+\ensuremath{\Conid{E}}, requires two type arguments, and everywhere we have to add the
+constraint \ensuremath{(\Conid{Num}\;\Varid{a})}.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;(\Conid{Num}\;\Varid{numType})\Rightarrow \Conid{E}\;\Varid{numType}\;\Varid{e}\mathrel{=}\Conid{Val}\;\Varid{numType}}$\\
+${\phantom{\mathbf{data}\;(\Conid{Num}\;\Varid{numType})\Rightarrow \Conid{E}\;\Varid{numType}\;\Varid{e}\mbox{}}\mid \Conid{Add}\;\Varid{e}\;\Varid{e}}$\\
+${}$\\
+${\mathbf{type}\;\Conid{Expr}\;\Varid{numType}\mathrel{=}\Conid{Fix}\;(\Conid{E}\;\Varid{numType})}$\\
+${}$\\
+${\mathbf{instance}\;(\Conid{Num}\;\Varid{a})\Rightarrow \Conid{Functor}\;(\Conid{E}\;\Varid{a})\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{Val}\;\Varid{n})\mathrel{=}\Conid{Val}\;\Varid{n}}$\\
+${\hskip2.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{Add}\;\Varid{e1}\;\Varid{e2})\mathrel{=}\Conid{Add}\;(\Varid{f}\;\Varid{e1})\;(\Varid{f}\;\Varid{e2})}$\\
+${}$\\
+${\mbox{\qquad-{}-  combine :: (Num a) => (E a) a -> a}}$\\
+${\hskip1.00em\relax\Varid{combine}\mathbin{::}(\Conid{Num}\;\Varid{a})\Rightarrow \Conid{Algebra}\;(\Conid{E}\;\Varid{a})\;\Varid{a}}$\\
+${\hskip1.00em\relax\Varid{combine}\;(\Conid{Val}\;\Varid{n})\mathrel{=}\Varid{n}}$\\
+${\hskip1.00em\relax\Varid{combine}\;(\Conid{Add}\;\Varid{n1}\;\Varid{n2})\mathrel{=}(\Varid{n1}\mathbin{+}\Varid{n2})}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;(\Conid{Num}\;\Varid{a})\Rightarrow (\Conid{AlgebraConstructor}\;(\Conid{E}\;\Varid{a})\;\Varid{a})\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\phi}\mathrel{=}\Varid{combine}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{evalExpr}\mathbin{::}(\Conid{Num}\;\Varid{a})\Rightarrow (\Conid{Expr}\;\Varid{a})\to \Varid{a}}$\\
+${\hskip1.00em\relax\Varid{evalExpr}\mathrel{=}\Varid{fold}\;\Varid{combine}}$
+\end{tabbing}
+We can use \ensuremath{\Varid{evalExprCata}} to get the same result with much less work:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\Varid{evalExprCata}\mathbin{::}(\Conid{Num}\;\Varid{a})\Rightarrow (\Conid{Expr}\;\Varid{a})\to \Varid{a}}$\\
+${\hskip1.00em\relax\Varid{evalExprCata}\mathrel{=}\Varid{pCata}}$
+\end{tabbing}
+\ensuremath{\Varid{test}_1} is a sample expression for evaluation: $(3 + ((1 + 10) + 4))$
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\Varid{test}_1\mathrel{=}(\Conid{In}\;(\Conid{Add}\;(\Conid{In}\;(\Conid{Val}\;\mathrm{3}))}$\\
+${\hskip1.00em\relax\phantom{\Varid{test}_1\mathrel{=}(\Conid{In}\;(\mbox{}}(\Conid{In}\;(\Conid{Add}\;(\Conid{In}\;(\Conid{Add}\;(\Conid{In}\;(\Conid{Val}\;\mathrm{1}))}$\\
+${\hskip1.00em\relax\phantom{\Varid{test}_1\mathrel{=}(\Conid{In}\;(\mbox{}}\phantom{(\Conid{In}\;(\Conid{Add}\;(\Conid{In}\;(\mbox{}}(\Conid{In}\;(\Conid{Val}\;\mathrm{10}))))}$\\
+${\hskip1.00em\relax\phantom{\Varid{test}_1\mathrel{=}(\Conid{In}\;(\mbox{}}\phantom{(\Conid{In}\;(\mbox{}}(\Conid{In}\;(\Conid{Val}\;\mathrm{4}))))))}$
+\end{tabbing}
+To combine with Duponcheel, we would like to compose our semantic
+evaluation functions into a single function.  For this, we will use a
+\ensuremath{\Conid{Sum}} type defined exactly as in Duponcheel:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{newtype}\;\Conid{Sum}\;\Varid{f}\;\Varid{g}\;\Varid{x}\mathrel{=}\Conid{S}\;(\Conid{Either}\;(\Varid{f}\;\Varid{x})\;(\Varid{g}\;\Varid{x}))}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{unS}\;(\Conid{S}\;\Varid{x})\mathrel{=}\Varid{x}}$
+\end{tabbing}
+and show that \ensuremath{\Conid{Sum}} types are members of the \ensuremath{\Conid{Functor}} and
+\ensuremath{\Conid{AlgebraConstructor}} classes so we can use \ensuremath{\Varid{pCata}} as our evaluation
+function.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{instance}\;(\Conid{Functor}\;\Varid{f},\Conid{Functor}\;\Varid{g})\Rightarrow \Conid{Functor}\;(\Conid{Sum}\;\Varid{f}\;\Varid{g})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\mathbf{where}\;\Varid{fmap}\;\Varid{h}\;(\Conid{S}\;(\Conid{Left}\;\Varid{x}))\mathrel{=}\Conid{S}\;(\Conid{Left}\mathbin{\$}\Varid{fmap}\;\Varid{h}\;\Varid{x})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mathbf{where}\;\mbox{}}\Varid{fmap}\;\Varid{h}\;(\Conid{S}\;(\Conid{Right}\;\Varid{x}))\mathrel{=}\Conid{S}\;(\Conid{Right}\mathbin{\$}\Varid{fmap}\;\Varid{h}\;\Varid{x})}$
+\end{tabbing}
+Here, using catamorphism instead of just fold, is a big win.
+the definition:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\Varid{\phi}\mathrel{=}\Varid{either}\;\Varid{\phi}\;\Varid{\phi}\mathbin{\circ}\Varid{unS}}$
+\end{tabbing}
+uses \ensuremath{\Varid{\phi}} to refer to 3 different implementations \ensuremath{\Varid{\phi}}.  We define
+\ensuremath{\Varid{\phi}} for the \ensuremath{\Conid{Sum}} type, using the \ensuremath{\Varid{\phi}} of each of the types we are
+\ensuremath{\Conid{Sum}}'ing.  This is the result of using the \ensuremath{\Conid{Algebra}} type class
+synonym rather than defining a separately named \ensuremath{\Varid{\phi}} for each term.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{instance}\;(\Conid{AlgebraConstructor}\;\Varid{f}\;\Varid{a},\Conid{AlgebraConstructor}\;\Varid{g}\;\Varid{a})\Rightarrow }$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Conid{AlgebraConstructor}\;(\Conid{Sum}\;\Varid{f}\;\Varid{g})\;\Varid{a}}$\\
+${\mbox{\qquad-{}-      phi :: Algebra fa == f a -> a}}$\\
+${\hskip5.00em\relax\mathbf{where}\;\Varid{\phi}\mathrel{=}\Varid{either}\;\Varid{\phi}\;\Varid{\phi}\mathbin{\circ}\Varid{unS}}$
+\end{tabbing}
+As an example we extend Expressions defined above to include
+multiplication.  I use this simple extension for brevity.  For
+\emph{any} extension, all we need to do is:
+
+\begin{enumerate}
+  \parskip=0pt\itemsep=0pt
+\item Define a new type for the extension
+\item Show the extension is belongs to Functor and AlgebraConstructor
+\item Define a new type, using Sum, to combine the original type with
+  the extension type.
+\end{enumerate}
+
+And, we have an evaluator for the more complex type, without modifying
+the base type and without defining any interaction between the two
+types.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{data}\;(\Conid{Num}\;\Varid{numType})\Rightarrow \Conid{M}\;\Varid{numType}\;\Varid{e}\mathrel{=}\Conid{Times}\;\Varid{e}\;\Varid{e}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;(\Conid{Num}\;\Varid{a})\Rightarrow \Conid{Functor}\;(\Conid{M}\;\Varid{a})\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{Times}\;\Varid{e1}\;\Varid{e2})\mathrel{=}\Conid{Times}\;(\Varid{f}\;\Varid{e1})\;(\Varid{f}\;\Varid{e2})}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;(\Conid{Num}\;\Varid{a})\Rightarrow (\Conid{AlgebraConstructor}\;(\Conid{M}\;\Varid{a})\;\Varid{a})\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\phi}\;(\Conid{Times}\;\Varid{x}\;\Varid{y})\mathrel{=}\Varid{x}\mathbin{*}\Varid{y}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{data}\;\Conid{BigE}\;\Varid{n}\;\Varid{a}\mathrel{=}\Conid{BE}\;(\Conid{Sum}\;(\Conid{E}\;\Varid{n})\;(\Conid{M}\;\Varid{n})\;\Varid{a})}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{type}\;\Conid{BigExpr}\;\Varid{numType}\mathrel{=}\Conid{Fix}\;(\Conid{BigE}\;\Varid{numType})}$
+\end{tabbing}
+Just a bit of boiler plate stuff.  Since \texttt{Haskell} requires
+that the new type, \ensuremath{\Conid{BigE}}, use a data constructor (named, \ensuremath{\Conid{BE}}, here);
+we have to show that this type is a member of \ensuremath{\Conid{Functor}} and
+\ensuremath{\Conid{AlgebraConstructor}} by simply ripping off this data constructor.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{instance}\;(\Conid{Num}\;\Varid{a})\Rightarrow \Conid{Functor}\;(\Conid{BigE}\;\Varid{a})\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{BE}\;\Varid{x})\mathrel{=}\Conid{BE}\;(\Varid{fmap}\;\Varid{f}\;\Varid{x})}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;(\Conid{Num}\;\Varid{a})\Rightarrow (\Conid{AlgebraConstructor}\;(\Conid{BigE}\;\Varid{a})\;\Varid{a})\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{\phi}\;(\Conid{BE}\;\Varid{x})\mathrel{=}\Varid{\phi}\;\Varid{x}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{evalBigExpr}\mathbin{::}(\Conid{Num}\;\Varid{a})\Rightarrow (\Conid{BigExpr}\;\Varid{a})\to \Varid{a}}$\\
+${\hskip1.00em\relax\Varid{evalBigExpr}\mathrel{=}\Varid{pCata}}$
+\end{tabbing}
+We can do the same thing with fold, but is a bit more clumsy.
+Now we must explicitly define the function to fold'ed over the sum.
+
+The class \ensuremath{\Conid{AlgebraConstructor}} (and then catamorphism) are able to
+eliminate this step, since this function is already known,
+with the name \ensuremath{\Varid{\phi}}.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\Varid{unBE}\;(\Conid{BE}\;\Varid{x})\mathrel{=}\Varid{x}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{combineM}\mathbin{::}(\Conid{Num}\;\Varid{a})\Rightarrow (\Conid{M}\;\Varid{a})\;\Varid{a}\to \Varid{a}}$\\
+${\hskip1.00em\relax\Varid{combineM}\;(\Conid{Times}\;\Varid{x}\;\Varid{y})\mathrel{=}\Varid{x}\mathbin{*}\Varid{y}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{summedCombine}\mathbin{::}(\Conid{Num}\;\Varid{a})\Rightarrow (\Conid{BigE}\;\Varid{a})\;\Varid{a}\to \Varid{a}}$\\
+${\hskip1.00em\relax\Varid{summedCombine}\mathrel{=}\Varid{either}\;\Varid{combine}\;\Varid{combineM}\mathbin{\circ}\Varid{unS}\mathbin{\circ}\Varid{unBE}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{evalBigExprFold}\mathbin{::}(\Conid{Num}\;\Varid{a})\Rightarrow (\Conid{BigExpr}\;\Varid{a})\to \Varid{a}}$\\
+${\hskip1.00em\relax\Varid{evalBigExprFold}\mathrel{=}\Varid{fold}\;\Varid{summedCombine}}$
+\end{tabbing}
+\section{Usage}
+
+This file is a template for transforming literate script into \LaTeX
+and is not actually a \texttt{Haskell} interpreter implementation.
+Each section in this file is a separate module that can be loaded
+individually for experimentation.
+
+
+Note that the interpreters have been developed under GHC and some
+require turning on the Glasgow Extensions.  Your mileage may vary if
+you're using HUGS.
+
+To build a \LaTeX document from the interpreter files, use:
+
+\begin{alltt}
+   lhs2TeX --math Hutton.lhs > Hutton.tex
+\end{alltt}
+
+and run \LaTeX on the result.  The individual interpreters cannot be
+transformed to \LaTeX directly.
+
+\end{document}

@@ -1,0 +1,91 @@
+[Initial Checkin
+Garrin Kimmell <kimmell@ku.edu>**20050927213555] 
+[Added elevator example.
+Garrin Kimmell <kimmell@ku.edu>**20050928015626
+ 
+ A beginning of an elevator simulation. Message types are defined for
+ clocks, pickups, and dropoffs. Right now the elevator scheduling is
+ very simplistic. Furthermore, there are no "agents" to request rides.
+] 
+[Elevator examples datatype changes.
+Garrin Kimmell <kimmell@ku.edu>**20050928211847
+ 
+ 1. Added a timestamp to the clock, made requisite
+    recognizer/destructor modifications.
+ 2. Added a "Steady" direction.
+ 3. Added Ord instance for Messages, to be used for sorting the thread
+    list by runMP
+] 
+[Added invDir case for Steady
+Garrin Kimmell <kimmell@ku.edu>**20050928211956] 
+[Added instance for MonadState for ReactT
+Garrin Kimmell <kimmell@ku.edu>**20050928212251] 
+[Sorting of thread list.
+Garrin Kimmell <kimmell@ku.edu>**20050928212540
+ 
+ Changed the nextEvent function so that it sorts the threads. This
+ relies on an Ord instance for the inner message (and an admittedly
+ arbitrary instance for Req). The idea is that we can start to add
+ message delivery policy in this way.
+] 
+[Refactoring of common combinators
+Garrin Kimmell <kimmell@ku.edu>**20050928213854
+ 
+ Removed test "say", "hear", and "shout" and added "send", "hear", and
+ "broadcast" which are not tied to any particular application message
+ type. 
+ 
+ Fixed the demonstration code. This required adding recognizers and a
+ destructor for the application message type.
+] 
+[Added combinators for event programming.
+Garrin Kimmell <kimmell@ku.edu>**20050928214208
+ 
+ The --->, +--->, and <||> combinators allow the composition of action
+ based on an event. 
+ 
+ p ---> a does a hear for a message satsfying p, then applies a to that
+ message.
+ 
+ p +--> a is a convenience for when a does not depend on the message --
+ a is simply an action, not a msg -> action.
+ 
+ <||> allows parallel composition of these event ---> action pairs. It
+ is left-biased on the match, however.
+] 
+[Removed ---> and <||> combinators, since they are now moved to the MT module.
+Garrin Kimmell <kimmell@ku.edu>**20050928214319] 
+[Added loop and loopArg combinator to MP
+Garrin Kimmell <kimmell@ku.edu>**20050928215314] 
+[Modifications to elevator logic
+Garrin Kimmell <kimmell@ku.edu>**20050928215402
+ 
+ 1. Various improvements to elevator definition
+ 2. Addition of a "passenger" process
+ 3. Added a "run" function for executing a simulation.
+ 4. Defined a ElMonad type for our elevator computations.
+] 
+[Clarified the comment on the clock wierdness.
+Garrin Kimmell <kimmell@ku.edu>**20050928232313] 
+[Adding test file
+Garrin Kimmell <kimmell@ku.edu>**20050928232739] 
+[Elevator with pragmas
+Nicolas Frisby <nfrisby@ittc.ku.edu>**20050929024649
+ Released {Elevator,MP}.lhs from the monomorpism restriction.
+] 
+[Named threads
+Nicolas Frisby <nfrisby@ittc.ku.edu>**20050929203654
+ 
+ Changed instance Ord so that it's round robin.
+ Made threads a tuple of String and computation.
+] 
+[Replaced broadcasts with a bus structure over P2P. See Gates.lhs. (Definitely breaks Elevator.lhs)
+Nicolas Frisby <kotsu@ku.edu>**20051004033817] 
+[Fixed Elevator to work with buses.
+Nicolas Frisby <kotsu@ku.edu>**20051007010942] 
+[Fixed passenger's extra bus ready on exit
+Nicolas Frisby <kotsu@ku.edu>**20051007012250] 
+[Allowed for delayed passengers. Elevator can no longer ignore clock.
+Nicolas Frisby <kotsu@ku.edu>**20051007183830] 
+[Added Bus.lhs
+Nicolas Frisby <kotsu@ku.edu>**20051017174304] 

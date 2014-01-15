@@ -1,0 +1,33 @@
+\chapter{Introduction}
+
+LPS is a Language Prototyping System based on 
+Modular Monadic Semantics.
+
+For more information, see: 
+
+http://lsi.uniovi.es/~labra/LPS/LPS.html
+
+Some papers describing the system are \cite{Labra98, Labra99}.
+
+
+Modular Monadic Semantics (\cite{LiangHudakJones95, LiangHudak96}) 
+separates values from computations. 
+
+A computation can be described by means of a monad \cite{Moggi89}. Using monad 
+transformers, a monad can be transformed into a different monad with
+more computational features.
+
+The system can be seen as a Domain Specific Language embedded in
+Haskell \cite{Haskell98}.
+
+In order to derive a programming language specification it is
+necessary to provide:
+
+\begin{itemize}
+\item A \emph{Parser} for the language
+\item A description of the domain values 
+\item A characterization of the monad that models the 
+	computation
+\end{itemize}
+
+

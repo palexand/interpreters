@@ -1,0 +1,651 @@
+\documentclass[10pt]{article}
+
+\usepackage{url}
+
+\parskip=\medskipamount
+\parindent=0pt
+
+%% ODER: format ==         = "\mathrel{==}"
+%% ODER: format /=         = "\neq "
+\makeatletter
+
+\usepackage{amstext}
+\usepackage{amssymb}
+\usepackage{stmaryrd}
+\DeclareFontFamily{OT1}{cmtex}{}
+\DeclareFontShape{OT1}{cmtex}{m}{n}
+  {<5><6><7><8>cmtex8
+   <9>cmtex9
+   <10><10.95><12><14.4><17.28><20.74><24.88>cmtex10}{}
+\DeclareFontShape{OT1}{cmtex}{m}{it}
+  {<-> ssub * cmtt/m/it}{}
+\newcommand{\texfamily}{\fontfamily{cmtex}\selectfont}
+\DeclareFontShape{OT1}{cmtt}{bx}{n}
+  {<5><6><7><8>cmtt8
+   <9>cmbtt9
+   <10><10.95><12><14.4><17.28><20.74><24.88>cmbtt10}{}
+\DeclareFontShape{OT1}{cmtex}{bx}{n}
+  {<-> ssub * cmtt/bx/n}{}
+\newcommand{\tex}[1]{\text{\texfamily#1}}	% NEU
+
+\newcommand{\Sp}{\hskip.33334em\relax}
+
+\newlength{\lwidth}\setlength{\lwidth}{4.5cm}
+\newlength{\cwidth}\setlength{\cwidth}{8mm} % 3mm
+
+\newcommand{\Conid}[1]{\mathit{#1}}
+\newcommand{\Varid}[1]{\mathit{#1}}
+\newcommand{\anonymous}{\kern0.06em \vbox{\hrule\@width.5em}}
+\newcommand{\plus}{\mathbin{+\!\!\!+}}
+\newcommand{\bind}{\mathbin{>\!\!\!>\mkern-6.7mu=}}
+\newcommand{\sequ}{\mathbin{>\!\!\!>}}
+\renewcommand{\leq}{\leqslant}
+\renewcommand{\geq}{\geqslant}
+\newcommand{\NB}{\textbf{NB}}
+\newcommand{\Todo}[1]{$\langle$\textbf{To do:}~#1$\rangle$}
+
+\makeatother
+\title{InterpreterLib Examples}
+\author{Uk'taad B'mal \\
+  Information and Telecommunications Technology Center \\
+  The University of Kansas \\
+  2335 Irving Hill Rd, Lawrence, KS 66045}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+  The purpose of this document is to provide an annoted example using
+  the \ensuremath{\Conid{InterprterLib}} package to define simple interpreters.  The
+  document assumes some knowledge of modular interpreter construction
+  and refers to earlier interpreters written by the uktab ad'bmal
+  group.  These are available upon request.
+\end{abstract}
+
+\section{Introduction}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mbox{\enskip\{-\# OPTIONS -fglasgow-exts -fno-monomorphism-restriction  \#-\}\enskip}}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Algebras}}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Functors}}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.SubType}}$\\
+${\mathbf{import}\;\Conid{Monad}}$\\
+${\mathbf{import}\;\Conid{\Conid{Control}.\Conid{Monad}.Reader}}$
+\end{tabbing}
+\section{Example Language}
+
+To demonstrate the use of the \ensuremath{\Conid{InterpreterLib}} definition
+capabilities, we will define an interpreter for an \ensuremath{\Conid{Integer}} language
+that implements some simple mathematical operations.
+
+\subsection{The Value Space}
+
+We start by defining a type for the interpreter's value space:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{Value}}$\\
+${\hskip2.00em\relax\mathrel{=}\Conid{ValNum}\;\Conid{Int}}$\\
+${\hskip2.00em\relax\mid \Conid{ValLambda}\;(\Conid{ValueMonad}\to \Conid{ValueMonad})}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Show}\;\Conid{Value}\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{show}\;(\Conid{ValNum}\;\Varid{x})\mathrel{=}\Varid{show}\;\Varid{x}}$\\
+${\hskip2.00em\relax\Varid{show}\;(\Conid{ValLambda}\;\anonymous )\mathrel{=}\text{\tt \char34 <Function~Value>\char34}}$
+\end{tabbing}
+There are two values in this language, integers and integer
+functions.
+
+\subsection{Defining AST Elements}
+
+Next, we define types for each of the language's AST elements.  For
+each AST element we define 5 elements: (i) the \ensuremath{\Conid{Algebra}} data type;
+(ii) the \ensuremath{\Conid{Term}} data type; (iii) the \ensuremath{\Conid{Functor}} instance; (iv) the
+\ensuremath{\Conid{Algebra}} instance; and (v) a helper function to create terms.  The
+\ensuremath{\Conid{Term}} data structure and \ensuremath{\Conid{Functor}} instance remain unchanged from
+previous modular interpreters.  The \ensuremath{\Conid{Term}} structure defines a
+non-recursive type for representing terms while the \ensuremath{\Conid{Functor}} defines
+a mechanism for folding operations onto the term structure.
+
+The algebra function does not change from previous interpreters.  It
+continues to provide a mapping from a term to a value.  The
+distinction is the \ensuremath{\Conid{Algebra}} type requires three parameters - the
+carrier set and the term type as before, plus the algebra structure
+used for evaluation.  Note that the algebra is the instance of
+\ensuremath{\Conid{Algebra}} while the algebra structure provides the definitions used by
+the algebra.
+
+The \ensuremath{\Varid{apply}} function defined for all \ensuremath{\Conid{Algebra}} instances takes the
+place of \ensuremath{\Varid{\phi}}.  It extracts what was \ensuremath{\Varid{\phi}} from the algebra structure
+and applies it.  Thus, \ensuremath{\Varid{apply}\;\Varid{alg}\;\Varid{t}} applies the interpretation
+function from \ensuremath{\Varid{alg}} to the term \ensuremath{\Varid{t}}.  In affect, \ensuremath{\Varid{\phi}\mathrel{=}(\Varid{apply}\;\Varid{alg})}.
+One important difference should be noted.  Frequently, \ensuremath{\Varid{\phi}} used
+parameter matching to pull apart an argument and process its parts.
+\ensuremath{\Varid{apply}} is virtually always called with the argument intact.
+
+We will start with the definition for integer constants:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{AlgConst}\;\Varid{t}\mathrel{=}\Conid{AlgC}\;((\Conid{ExprConst}\;\Varid{t})\to \Varid{t})}$\\
+${}$\\
+${\mathbf{data}\;\Conid{ExprConst}\;\Varid{e}\mathrel{=}\Conid{EConst}\;\Conid{Int}}$\\
+${\phantom{\mathbf{data}\;\Conid{ExprConst}\;\Varid{e}\mathrel{=}\mbox{}}\mathbf{deriving}\;(\Conid{Show},\Conid{Eq})}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Functor}\;\Conid{ExprConst}\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{map}_{f}\;\Varid{f}\;(\Conid{EConst}\;\Varid{x})\mathrel{=}\Conid{EConst}\;\Varid{x}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Algebra}\;\Conid{ExprConst}\;\Conid{AlgConst}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{apply}\;(\Conid{AlgC}\;\Varid{f})\;\Varid{x}\mathord{@}(\Conid{EConst}\;\anonymous )\mathrel{=}(\Varid{f}\;\Varid{x})}$\\
+${}$\\
+${\Varid{mkEConst}\mathrel{=}\Varid{inn}\mathbin{\circ}\Varid{sleft}\mathbin{\circ}\Conid{EConst}}$
+\end{tabbing}
+Let's step through the definition for \ensuremath{\Conid{Integer}}.  \ensuremath{\Conid{AlgConst}} is the
+algebra structure defining interpretation of constants.  It's only
+parameter is a function that maps \ensuremath{\Conid{ExperConst}} instances over some
+carrier set, \ensuremath{\Varid{t}} to \ensuremath{\Varid{t}}.  This is precisely the signature of \ensuremath{\Varid{\phi}}
+from earlier interpreters.  However, instead of using polymorphism to
+find \ensuremath{\Varid{\phi}}, we'll get it directly from the algebra when we invoke the
+catamorphism.
+
+\ensuremath{\Conid{ExprConst}} is the datatype associated with constants and is an
+instance of \ensuremath{\Conid{Functor}}.  \ensuremath{\Conid{ExprConst}} is an instance of \ensuremath{\Conid{Functor}} and
+\ensuremath{\Varid{map}_{f}} is defined in the canonical fashion to simply return the
+constant it is passed.
+
+\ensuremath{\Conid{ExprConst}} is also an instance of \ensuremath{\Conid{Algebra}}.  Here, the definition is
+different because \ensuremath{\Varid{apply}} takes two arguments - an algebra structure
+and a term - rather than one as it did in earlier implementations.  In
+this case, \ensuremath{\Varid{apply}} first extracts the interpretation function, \ensuremath{\Varid{f}},
+from the algebra structure.  It then makes sure the term argument is
+the correct type and associates it with \ensuremath{\Varid{x}}. With the evaluation
+function and the term available, \ensuremath{\Varid{apply}} simply calls the
+evaluation function on the term.
+
+The \ensuremath{\Varid{mkEConst}} function is a helper function that constructs a
+complete \ensuremath{\Conid{ExprConstant}} term.  Defining terms is a real pain with all
+of the \ensuremath{\Conid{Sum}} and \ensuremath{\Conid{Fix}} cruft floating around.  I suspect that these
+helper functions will need to be rewritten whenever the language
+changes due to the structure of the \ensuremath{\Conid{Sum}}.  There may be a way around
+this similar to the techniques used in earlier languages.
+
+The addition and multiplication terms are defined similarly:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{AlgAdd}\;\Varid{t}\mathrel{=}\Conid{AlgAdd}\{\mskip1.5mu \Varid{add}\mathbin{::}(\Conid{ExprAdd}\;\Varid{t})\to \Varid{t},}$\\
+${\phantom{\mathbf{data}\;\Conid{AlgAdd}\;\Varid{t}\mathrel{=}\Conid{AlgAdd}\{\mskip1.5mu \mbox{}}\Varid{sub}\mathbin{::}(\Conid{ExprAdd}\;\Varid{t})\to \Varid{t}\mskip1.5mu\}}$\\
+${}$\\
+${\mathbf{data}\;\Conid{ExprAdd}\;\Varid{e}\mathrel{=}\Conid{EAdd}\;\Varid{e}\;\Varid{e}}$\\
+${\phantom{\mathbf{data}\;\Conid{ExprAdd}\;\Varid{e}\mbox{}}\mid \Conid{ESub}\;\Varid{e}\;\Varid{e}}$\\
+${\phantom{\mathbf{data}\;\Conid{ExprAdd}\;\Varid{e}\mbox{}}\phantom{\mid \mbox{}}\mathbf{deriving}\;(\Conid{Show},\Conid{Eq})}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Functor}\;\Conid{ExprAdd}\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{map}_{f}\;\Varid{f}\;(\Conid{EAdd}\;\Varid{x}\;\Varid{y})\mathrel{=}(\Conid{EAdd}\;(\Varid{f}\;\Varid{x})\;(\Varid{f}\;\Varid{y}))}$\\
+${\hskip2.00em\relax\Varid{map}_{f}\;\Varid{f}\;(\Conid{ESub}\;\Varid{x}\;\Varid{y})\mathrel{=}(\Conid{ESub}\;(\Varid{f}\;\Varid{x})\;(\Varid{f}\;\Varid{y}))}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Algebra}\;\Conid{ExprAdd}\;\Conid{AlgAdd}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{x}\mathord{@}(\Conid{EAdd}\;\anonymous \;\anonymous )\mathrel{=}(\Varid{add}\;\Varid{alg}\;\Varid{x})}$\\
+${\hskip2.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{x}\mathord{@}(\Conid{ESub}\;\anonymous \;\anonymous )\mathrel{=}(\Varid{sub}\;\Varid{alg}\;\Varid{x})}$\\
+${}$\\
+${\Varid{mkEAdd}\;\Varid{x}\;\Varid{y}\mathrel{=}\Varid{inn}\mathbin{\$}\Varid{sright}\mathbin{\$}\Varid{sleft}\mathbin{\$}\Conid{EAdd}\;\Varid{x}\;\Varid{y}}$\\
+${\Varid{mkESub}\;\Varid{x}\;\Varid{y}\mathrel{=}\Varid{inn}\mathbin{\$}\Varid{sright}\mathbin{\$}\Varid{sleft}\mathbin{\$}\Conid{ESub}\;\Varid{x}\;\Varid{y}}$
+\end{tabbing}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{AlgMult}\;\Varid{t}\mathrel{=}\Conid{AlgMult}\{\mskip1.5mu \Varid{mult}\mathbin{::}(\Conid{ExprMult}\;\Varid{t})\to \Varid{t},}$\\
+${\phantom{\mathbf{data}\;\Conid{AlgMult}\;\Varid{t}\mathrel{=}\Conid{AlgMult}\{\mskip1.5mu \mbox{}}\Varid{divi}\mathbin{::}(\Conid{ExprMult}\;\Varid{t})\to \Varid{t}\mskip1.5mu\}}$\\
+${}$\\
+${\mathbf{data}\;\Conid{ExprMult}\;\Varid{e}\mathrel{=}\Conid{EMult}\;\Varid{e}\;\Varid{e}}$\\
+${\phantom{\mathbf{data}\;\Conid{ExprMult}\;\Varid{e}\mbox{}}\mid \Conid{EDiv}\;\Varid{e}\;\Varid{e}}$\\
+${\phantom{\mathbf{data}\;\Conid{ExprMult}\;\Varid{e}\mbox{}}\phantom{\mid \mbox{}}\mathbf{deriving}\;(\Conid{Show},\Conid{Eq})}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Functor}\;\Conid{ExprMult}\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{map}_{f}\;\Varid{f}\;(\Conid{EMult}\;\Varid{x}\;\Varid{y})\mathrel{=}(\Conid{EMult}\;(\Varid{f}\;\Varid{x})\;(\Varid{f}\;\Varid{y}))}$\\
+${\hskip2.00em\relax\Varid{map}_{f}\;\Varid{f}\;(\Conid{EDiv}\;\Varid{x}\;\Varid{y})\mathrel{=}(\Conid{EDiv}\;(\Varid{f}\;\Varid{x})\;(\Varid{f}\;\Varid{y}))}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Algebra}\;\Conid{ExprMult}\;\Conid{AlgMult}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{x}\mathord{@}(\Conid{EMult}\;\anonymous \;\anonymous )\mathrel{=}(\Varid{mult}\;\Varid{alg}\;\Varid{x})}$\\
+${\hskip2.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{x}\mathord{@}(\Conid{EDiv}\;\anonymous \;\anonymous )\mathrel{=}(\Varid{divi}\;\Varid{alg}\;\Varid{x})}$\\
+${}$\\
+${\Varid{mkEMult}\;\Varid{x}\;\Varid{y}\mathrel{=}\Varid{inn}\mathbin{\$}\Varid{sright}\mathbin{\$}\Varid{sright}\mathbin{\$}\Varid{sleft}\mathbin{\$}\Conid{EMult}\;\Varid{x}\;\Varid{y}}$\\
+${\Varid{mkEDiv}\;\Varid{x}\;\Varid{y}\mathrel{=}\Varid{inn}\mathbin{\$}\Varid{sright}\mathbin{\$}\Varid{sright}\mathbin{\$}\Varid{sleft}\mathbin{\$}\Conid{EDiv}\;\Varid{x}\;\Varid{y}}$
+\end{tabbing}
+At this point we have elements of a simple language for arithmetic
+with no variables or functions.  We can add lambdas, applications and
+variables using techniques similar to those from earlier interpreters:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{ExprFun}\;\Varid{t}}$\\
+${\hskip2.00em\relax\mathrel{=}\Conid{ELambda}\;\Conid{String}\;\Conid{TyValue}\;\Varid{t}}$\\
+${\hskip2.00em\relax\mid \Conid{EApp}\;\Varid{t}\;\Varid{t}}$\\
+${\hskip2.00em\relax\mid \Conid{EVar}\;\Conid{String}}$\\
+${\hskip2.00em\relax\phantom{\mid \mbox{}}\mathbf{deriving}\;(\Conid{Show},\Conid{Eq})}$\\
+${}$\\
+${\mathbf{data}\;\Conid{AlgFun}\;\Varid{t}\mathrel{=}\Conid{AlgFun}\{\mskip1.5mu \Varid{lam}\mathbin{::}\Conid{ExprFun}\;\Varid{t}\to \Varid{t},}$\\
+${\phantom{\mathbf{data}\;\Conid{AlgFun}\;\Varid{t}\mathrel{=}\Conid{AlgFun}\{\mskip1.5mu \mbox{}}\Varid{app}\mathbin{::}\Conid{ExprFun}\;\Varid{t}\to \Varid{t},}$\\
+${\phantom{\mathbf{data}\;\Conid{AlgFun}\;\Varid{t}\mathrel{=}\Conid{AlgFun}\{\mskip1.5mu \mbox{}}\Varid{var}\mathbin{::}\Conid{ExprFun}\;\Varid{t}\to \Varid{t}\mskip1.5mu\}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Functor}\;\Conid{ExprFun}\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{map}_{f}\;\Varid{f}\;(\Conid{ELambda}\;\Varid{s}\;\Varid{ty}\;\Varid{t})\mathrel{=}\Conid{ELambda}\;\Varid{s}\;\Varid{ty}\;(\Varid{f}\;\Varid{t})}$\\
+${\hskip2.00em\relax\Varid{map}_{f}\;\Varid{f}\;(\Conid{EApp}\;\Varid{t1}\;\Varid{t2})\mathrel{=}\Conid{EApp}\;(\Varid{f}\;\Varid{t1})\;(\Varid{f}\;\Varid{t2})}$\\
+${\hskip2.00em\relax\Varid{map}_{f}\;\Varid{f}\;(\Conid{EVar}\;\Varid{s})\mathrel{=}(\Conid{EVar}\;\Varid{s})}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Algebra}\;\Conid{ExprFun}\;\Conid{AlgFun}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{x}\mathord{@}(\Conid{EApp}\;\anonymous \;\anonymous )\mathrel{=}(\Varid{app}\;\Varid{alg}\;\Varid{x})}$\\
+${\hskip2.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{x}\mathord{@}(\Conid{ELambda}\;\anonymous \;\anonymous \;\anonymous )\mathrel{=}(\Varid{lam}\;\Varid{alg}\;\Varid{x})}$\\
+${\hskip2.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{x}\mathord{@}(\Conid{EVar}\;\anonymous )\mathrel{=}(\Varid{var}\;\Varid{alg}\;\Varid{x})}$\\
+${}$\\
+${\Varid{mkEVar}\;\Varid{x}\mathrel{=}\Varid{inn}\mathbin{\$}\Varid{sright}\mathbin{\$}\Varid{sright}\mathbin{\$}\Varid{sright}\mathbin{\$}\Conid{EVar}\;\Varid{x}}$\\
+${\Varid{mkELambda}\;\Varid{x}\;\Varid{ty}\;\Varid{y}\mathrel{=}\Varid{inn}\mathbin{\$}\Varid{sright}\mathbin{\$}\Varid{sright}\mathbin{\$}\Varid{sright}\mathbin{\$}\Conid{ELambda}\;\Varid{x}\;\Varid{ty}\;\Varid{y}}$\\
+${\Varid{mkEApp}\;\Varid{x}\;\Varid{y}\mathrel{=}\Varid{inn}\mathbin{\$}\Varid{sright}\mathbin{\$}\Varid{sright}\mathbin{\$}\Varid{sright}\mathbin{\$}\Conid{EApp}\;\Varid{x}\;\Varid{y}}$
+\end{tabbing}
+Note that the same five elements are defined for the collection of
+lambda terms as for previous language elements.
+
+The lambda implemented here uses a \ensuremath{\Conid{Reader}} monad to maintain
+variables and their values in the execution environment as lambdas are
+applied to values.  As each application is processes, the variable
+being replaced is paired with the value specified by the application.
+This is stored in the environment and used to determine the value of a
+variable when it is referenced.
+
+\subsection{Composing AST Elements}
+
+The full language is now defined as the fixed point of the sum of
+language components.  Here we have defined \ensuremath{\mathbin{:\$:}} as an infix form of
+\ensuremath{\Conid{Sum}}.  However, the semantics is unchanged from previous
+interpreters.  \ensuremath{\Conid{TermType}} is the sum of term definitions and
+\ensuremath{\Conid{TermLang}} is the fixed point of the term definition.\footnote{\ensuremath{\Conid{Fix}}
+and \ensuremath{\mathbin{:\$:}} are both defined in module \ensuremath{\Conid{Functor}}.}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{type}\;\Conid{TermType}\mathrel{=}(\Conid{ExprConst}\mathbin{:\$:}(\Conid{ExprAdd}\mathbin{:\$:}(\Conid{ExprMult}\mathbin{:\$:}\Conid{ExprFun})))}$\\
+${}$\\
+${\mathbf{type}\;\Conid{TermLang}\mathrel{=}\Conid{Fix}\;\Conid{TermType}}$
+\end{tabbing}
+\section{Language Semantics}
+
+We've now set up types for defining interpreters over this simple
+language, but we've not defined a specific semantics for the language.
+This is done by defining an algebra structure that provides
+\ensuremath{\Varid{apply}} for each term AST and summing the result to form an algebra
+for the complete language.
+
+We start by defining types and functions for manipulating the
+environment.  \ensuremath{\Conid{ValueMonad}} is the monad used to maintain the
+environment as values are calculated for terms.  \ensuremath{\Conid{Env}} is the
+environment an is defined as a single element record containing a list
+\ensuremath{\Conid{String}}, \ensuremath{\Conid{Value}} pairs associating values with variables.
+\ensuremath{\Varid{lookupVal}} and \ensuremath{\Varid{addVal}} are helper functions for looking up and
+adding variable values to the environment.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{type}\;\Conid{ValueMonad}\mathrel{=}\Conid{Reader}\;\Conid{Env}\;\Conid{Value}}$\\
+${}$\\
+${\mathbf{data}\;\Conid{Env}\mathrel{=}\Conid{Env}\{\mskip1.5mu \Varid{variables}\mathbin{::}[\mskip1.5mu (\Conid{String},\Conid{Value})\mskip1.5mu]\mskip1.5mu\}}$\\
+${}$\\
+${\Varid{lookupVal}\;\Varid{name}\;\Varid{env}\mathrel{=}\Varid{lookup}\;\Varid{name}\;(\Varid{variables}\;\Varid{env})}$\\
+${}$\\
+${\Varid{addVal}\;\Varid{b}\;\Varid{env}\mathrel{=}\Conid{Env}\{\mskip1.5mu \Varid{variables}\mathrel{=}\Varid{b}\mathbin{:}(\Varid{variables}\;\Varid{env})\mskip1.5mu\}}$
+\end{tabbing}
+\subsection{Semantic Elements}
+
+Now we define helper functions that specify how each term type is
+evaluated.  One function is defined for each AST construct.  These
+definitions could easily be directly embedded in algebra structures
+and not defined separately.  However, the algebra structure definition
+is greatly simplified by using this approach.  They will each be
+inserted into an algebra structure prior to their use.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{phiConst}\;(\Conid{EConst}\;\Varid{x})\mathrel{=}\Varid{return}\;(\Conid{ValNum}\;\Varid{x})}$\\
+${}$\\
+${\Varid{vPlus}\;(\Conid{ValNum}\;\Varid{x})\;(\Conid{ValNum}\;\Varid{y})\mathrel{=}\Conid{ValNum}\;(\Varid{x}\mathbin{+}\Varid{y})}$\\
+${\Varid{vSub}\;(\Conid{ValNum}\;\Varid{x})\;(\Conid{ValNum}\;\Varid{y})\mathrel{=}\Conid{ValNum}\;(\Varid{x}\mathbin{-}\Varid{y})}$\\
+${}$\\
+${\Varid{phiAdd}\;(\Conid{EAdd}\;\Varid{x1}\;\Varid{x2})\mathrel{=}\Varid{liftM2}\;\Varid{vPlus}\;\Varid{x1}\;\Varid{x2}}$\\
+${\Varid{phiSub}\;(\Conid{ESub}\;\Varid{x1}\;\Varid{x2})\mathrel{=}\Varid{liftM2}\;\Varid{vSub}\;\Varid{x1}\;\Varid{x2}}$\\
+${}$\\
+${\Varid{vMult}\;(\Conid{ValNum}\;\Varid{x})\;(\Conid{ValNum}\;\Varid{y})\mathrel{=}\Conid{ValNum}\;(\Varid{x}\mathbin{*}\Varid{y})}$\\
+${\Varid{vDiv}\;(\Conid{ValNum}\;\Varid{x})\;(\Conid{ValNum}\;\Varid{y})\mathrel{=}\Conid{ValNum}\;((\Varid{div})\;\Varid{x}\;\Varid{y})}$\\
+${}$\\
+${\Varid{phiMult}\;(\Conid{EMult}\;\Varid{x1}\;\Varid{x2})\mathrel{=}\Varid{liftM2}\;\Varid{vMult}\;\Varid{x1}\;\Varid{x2}}$\\
+${\Varid{phiDiv}\;(\Conid{EDiv}\;\Varid{x1}\;\Varid{x2})\mathrel{=}\Varid{liftM2}\;\Varid{vDiv}\;\Varid{x1}\;\Varid{x2}}$\\
+${}$\\
+${\Varid{phiLambda}\;(\Conid{ELambda}\;\Varid{s}\;\anonymous \;\Varid{t})\mathrel{=}}$\\
+${\hskip2.00em\relax\mathbf{do}\;\{\mskip1.5mu \Varid{env}\leftarrow \Varid{ask}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{return}\mathbin{\$}\Conid{ValLambda}\;(\lambda \Varid{v}\to (\mathbf{do}\;\{\mskip1.5mu \Varid{v'}\leftarrow \Varid{v}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\Varid{return}\mathbin{\$}\Conid{ValLambda}\;(\lambda \Varid{v}\to (\mathbf{do}\;\mbox{}};(\Varid{local}\;(\Varid{const}\;(\Varid{addVal}\;(\Varid{s},\Varid{v'})\;\Varid{env}))\;\Varid{t})}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\Varid{return}\mathbin{\$}\Conid{ValLambda}\;(\lambda \Varid{v}\to (\mathbf{do}\;\mbox{}}\mskip1.5mu\}))\mskip1.5mu\}}$\\
+${\Varid{phiApp}\;(\Conid{EApp}\;\Varid{x1}\;\Varid{x2})\mathrel{=}}$\\
+${\hskip2.00em\relax\mathbf{do}\;\{\mskip1.5mu \Varid{x1'}\leftarrow \Varid{x1}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\mathbf{case}\;\Varid{x1'}\;\mathbf{of}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}(\Conid{ValLambda}\;\Varid{f})\to (\Varid{f}\;\Varid{x2})}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\anonymous \to \Varid{error}\;\text{\tt \char34 Cannot~apply~non-lambda~value\char34}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$\\
+${\Varid{phiVar}\;(\Conid{EVar}\;\Varid{s})\mathrel{=}\mathbf{do}\;\{\mskip1.5mu \Varid{v}\leftarrow \Varid{asks}\;(\Varid{lookupVal}\;\Varid{s})}$\\
+${\phantom{\Varid{phiVar}\;(\Conid{EVar}\;\Varid{s})\mathrel{=}\mathbf{do}\;\mbox{}};\mathbf{case}\;\Varid{v}\;\mathbf{of}}$\\
+${\phantom{\Varid{phiVar}\;(\Conid{EVar}\;\Varid{s})\mathrel{=}\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}(\Conid{Just}\;\Varid{x})\to \Varid{return}\;\Varid{x}}$\\
+${\phantom{\Varid{phiVar}\;(\Conid{EVar}\;\Varid{s})\mathrel{=}\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\Conid{Nothing}\to \Varid{error}\;\text{\tt \char34 Variable~not~found\char34}}$\\
+${\phantom{\Varid{phiVar}\;(\Conid{EVar}\;\Varid{s})\mathrel{=}\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$
+\end{tabbing}
+Note the use of \ensuremath{\Varid{liftM2}} to evaluate \ensuremath{\Varid{x1}} and \ensuremath{\Varid{x2}} prior to applying
+the actual evaluation function.  In effect, \ensuremath{\Varid{x1}} and \ensuremath{\Varid{x2}} are
+evaluated in a \ensuremath{\mathbf{do}} construct, then the specified function applied and
+the result packaged back into the monad using \ensuremath{\Varid{return}}.  The
+definition of \ensuremath{\Varid{liftM2}} is in the \ensuremath{\Conid{\Conid{Control}.Monad}} package, but is
+repeated at the end of this file for documentation purposes.
+
+\subsection{Composign Semantic Elements}
+
+The full term algebra is formed by creating algebra structures for
+each term from the definitions above and summing those definitions
+together.  \ensuremath{\Conid{AlgC}}, \ensuremath{\Conid{AlgAdd}}, \ensuremath{\Conid{AlgMult}} and \ensuremath{\Conid{AlgFun}} take a function
+and build an algebra structure around it.  This is what the data type
+definitions earlier are for.  \ensuremath{\mathbin{@+@}} is an infix Sum operation for
+algebra structures.  This works the same way as the term sum to
+combine algebra structures into a single structure.\footnote{I believe
+  the order structure of this sum and the term sum must be the same.
+  Specifically, \ensuremath{\Conid{AlgCost}} and \ensuremath{\Conid{ExprConst}} are both first; \ensuremath{\Conid{AlgAdd}} and
+  \ensuremath{\Conid{ExprAdd}} are both second; and so forth.  I have not tested this
+  assumption, but it would make very good sense to do it this way.}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{termAlg}\mathrel{=}(\Conid{AlgC}\;\Varid{phiConst})}$\\
+${\phantom{\Varid{termAlg}\mathrel{=}\mbox{}}\mathbin{@+@}(\Conid{AlgAdd}\;\Varid{phiAdd}\;\Varid{phiSub})}$\\
+${\phantom{\Varid{termAlg}\mathrel{=}\mbox{}}\mathbin{@+@}(\Conid{AlgMult}\;\Varid{phiMult}\;\Varid{phiDiv})}$\\
+${\phantom{\Varid{termAlg}\mathrel{=}\mbox{}}\mathbin{@+@}(\Conid{AlgFun}\;\Varid{phiLambda}\;\Varid{phiApp}\;\Varid{phiVar})}$
+\end{tabbing}
+The \ensuremath{\Varid{evalFun}} function composes \ensuremath{\Varid{runReader}} and \ensuremath{\Varid{cata}} to define
+evaluation.  The heart of this function is the polytypic fold, or
+catamorphism.  \ensuremath{(\Varid{cata}\;\Varid{termAlg})} instantiates the \ensuremath{\Varid{cata}} function with
+the evaluation algebra.  When applied to a term, it will produce a
+\ensuremath{\Conid{ValueMonad}} that is then evaluated by \ensuremath{\Varid{runReader}}.  
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{evalFun}\mathrel{=}\Varid{runReader}\mathbin{\circ}(\Varid{cata}\;\Varid{termAlg})}$
+\end{tabbing}
+An initial value for the environment must be provided to \ensuremath{\Varid{evalFun}} for
+the reader to evaluate completely.  To evaluate \ensuremath{\Varid{term1}} starting with
+an empty environment, execute the following:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${(\Varid{evalFun}\;\Varid{term1})\;\Conid{Env}\{\mskip1.5mu \Varid{variables}\mathrel{=}[\mskip1.5mu \mskip1.5mu]\mskip1.5mu\}}$
+\end{tabbing}
+\section{A Second Interpreter}
+
+Now let's have some fun and define a different evaluation function for
+this language.  If all is well, we should be able to define a new
+algebra structure, use the same sum and evaluate the language over a
+different carrier set.  For this experiment, we'll use the simple
+odd/even carrier set.
+
+First define the odd/even data type and some helper functions.
+Probably could use instances and continue to use + and *, but that's
+more than we really want to do here.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{OE}\mathrel{=}\Conid{Odd}\mid \Conid{Even}\;\mathbf{deriving}\;(\Conid{Show},\Conid{Eq})}$\\
+${}$\\
+${\Varid{oePlus}\mathbin{::}\Conid{OE}\to \Conid{OE}\to \Conid{OE}}$\\
+${\Varid{oePlus}\;\Conid{Odd}\;\Conid{Odd}\mathrel{=}\Conid{Even}}$\\
+${\Varid{oePlus}\;\Conid{Odd}\;\Conid{Even}\mathrel{=}\Conid{Odd}}$\\
+${\Varid{oePlus}\;\Conid{Even}\;\Conid{Odd}\mathrel{=}\Conid{Odd}}$\\
+${\Varid{oePlus}\;\Conid{Even}\;\Conid{Even}\mathrel{=}\Conid{Even}}$\\
+${}$\\
+${\Varid{oeTimes}\mathbin{::}\Conid{OE}\to \Conid{OE}\to \Conid{OE}}$\\
+${\Varid{oeTimes}\;\Conid{Odd}\;\Conid{Odd}\mathrel{=}\Conid{Odd}}$\\
+${\Varid{oeTimes}\;\Conid{Odd}\;\Conid{Even}\mathrel{=}\Conid{Even}}$\\
+${\Varid{oeTimes}\;\Conid{Even}\;\Conid{Odd}\mathrel{=}\Conid{Even}}$\\
+${\Varid{oeTimes}\;\Conid{Even}\;\Conid{Even}\mathrel{=}\Conid{Even}}$
+\end{tabbing}
+Second, define the evaluation functions that we'll use with \ensuremath{\Varid{apply}}.
+For these definitions, we'll define \ensuremath{\Varid{alpha}}, the abstraction function
+for constant values, and define the various evaluation functions using
+\ensuremath{\Varid{alpha}} when necessary.  This will allow us to check soundness later.
+Note that we have to be careful about the name space and use unique
+names here.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{AbsValue}}$\\
+${\hskip2.00em\relax\mathrel{=}\Conid{AbsValNum}\;\Conid{OE}}$\\
+${\hskip2.00em\relax\mid \Conid{AbsValLambda}\;(\Conid{AbsValueMonad}\to \Conid{AbsValueMonad})}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Show}\;\Conid{AbsValue}\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{show}\;(\Conid{AbsValNum}\;\Varid{v})\mathrel{=}\Varid{show}\;\Varid{v}}$\\
+${\hskip2.00em\relax\Varid{show}\;(\Conid{AbsValLambda}\;\anonymous )\mathrel{=}\text{\tt \char34 <Abstract~Function~Value>\char34}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Eq}\;\Conid{AbsValue}\;\mathbf{where}}$\\
+${\hskip2.00em\relax(\equiv )\;(\Conid{AbsValNum}\;\Varid{x})\;(\Conid{AbsValNum}\;\Varid{y})\mathrel{=}(\Varid{x}\equiv \Varid{y})}$\\
+${\hskip2.00em\relax(\equiv )\;(\Conid{AbsValLambda}\;\Varid{x})\;(\Conid{AbsValLambda}\;\Varid{y})\mathrel{=}\Varid{error}\;\text{\tt \char34 Cannot~compare~functions.\char34}}$\\
+${}$\\
+${\mathbf{type}\;\Conid{AbsValueMonad}\mathrel{=}\Conid{Reader}\;\Conid{AbsEnv}\;\Conid{AbsValue}}$\\
+${}$\\
+${\mathbf{data}\;\Conid{AbsEnv}\mathrel{=}\Conid{AbsEnv}\{\mskip1.5mu \Varid{absVariables}\mathbin{::}[\mskip1.5mu (\Conid{String},\Conid{AbsValue})\mskip1.5mu]\mskip1.5mu\}}$\\
+${}$\\
+${\Varid{lookupAbsVal}\;\Varid{name}\;\Varid{env}\mathrel{=}\Varid{lookup}\;\Varid{name}\;(\Varid{absVariables}\;\Varid{env})}$\\
+${}$\\
+${\Varid{addAbsVal}\;\Varid{b}\;\Varid{env}\mathrel{=}\Conid{AbsEnv}\{\mskip1.5mu \Varid{absVariables}\mathrel{=}\Varid{b}\mathbin{:}(\Varid{absVariables}\;\Varid{env})\mskip1.5mu\}}$
+\end{tabbing}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{alpha}\;\Varid{x}\mathrel{=}\Conid{AbsValNum}\mathbin{\$}\mathbf{if}\;(\Varid{odd}\;\Varid{x})\;\mathbf{then}\;\Conid{Odd}\;\mathbf{else}\;\Conid{Even}}$
+\end{tabbing}
+Now define evaluation functions for each element of the AST:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{phi1Const}\;(\Conid{EConst}\;\Varid{x})\mathrel{=}\Varid{return}\;(\Varid{alpha}\;\Varid{x})}$\\
+${}$\\
+${\Varid{aPlus}\;(\Conid{AbsValNum}\;\Varid{x})\;(\Conid{AbsValNum}\;\Varid{y})\mathrel{=}\Conid{AbsValNum}\;(\Varid{oePlus}\;\Varid{x}\;\Varid{y})}$\\
+${\Varid{phi1Add}\;(\Conid{EAdd}\;\Varid{x1}\;\Varid{x2})\mathrel{=}\Varid{liftM2}\;\Varid{aPlus}\;\Varid{x1}\;\Varid{x2}}$\\
+${\Varid{phi1Sub}\;(\Conid{ESub}\;\Varid{x1}\;\Varid{x2})\mathrel{=}\Varid{liftM2}\;\Varid{aPlus}\;\Varid{x1}\;\Varid{x2}}$\\
+${}$\\
+${\Varid{aTimes}\;(\Conid{AbsValNum}\;\Varid{x})\;(\Conid{AbsValNum}\;\Varid{y})\mathrel{=}\Conid{AbsValNum}\;(\Varid{oeTimes}\;\Varid{x}\;\Varid{y})}$\\
+${\Varid{phi1Mult}\;(\Conid{EMult}\;\Varid{x1}\;\Varid{x2})\mathrel{=}\Varid{liftM2}\;\Varid{aTimes}\;\Varid{x1}\;\Varid{x2}}$\\
+${\Varid{phi1Div}\;(\Conid{EDiv}\;\Varid{x1}\;\Varid{x2})\mathrel{=}\Varid{liftM2}\;\Varid{aTimes}\;\Varid{x1}\;\Varid{x2}}$\\
+${}$\\
+${\Varid{phi1Lambda}\;(\Conid{ELambda}\;\Varid{s}\;\anonymous \;\Varid{t})\mathrel{=}}$\\
+${\hskip2.00em\relax\mathbf{do}\;\{\mskip1.5mu \Varid{env}\leftarrow \Varid{ask}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{return}\mathbin{\$}\Conid{AbsValLambda}\;(\lambda \Varid{v}\to (\mathbf{do}\;\{\mskip1.5mu \Varid{v'}\leftarrow \Varid{v}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\Varid{return}\mathbin{\$}\Conid{AbsValLambda}\;(\lambda \Varid{v}\to (\mathbf{do}\;\mbox{}};(\Varid{local}\;(\Varid{const}\;(\Varid{addAbsVal}\;(\Varid{s},\Varid{v'})\;\Varid{env}))\;\Varid{t})}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\Varid{return}\mathbin{\$}\Conid{AbsValLambda}\;(\lambda \Varid{v}\to (\mathbf{do}\;\mbox{}}\mskip1.5mu\}))\mskip1.5mu\}}$\\
+${}$\\
+${\Varid{phi1App}\;(\Conid{EApp}\;\Varid{x1}\;\Varid{x2})\mathrel{=}}$\\
+${\hskip2.00em\relax\mathbf{do}\;\{\mskip1.5mu \Varid{x1'}\leftarrow \Varid{x1}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\mathbf{case}\;\Varid{x1'}\;\mathbf{of}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}(\Conid{AbsValLambda}\;\Varid{f})\to (\Varid{f}\;\Varid{x2})}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\anonymous \to \Varid{error}\;\text{\tt \char34 Cannot~apply~non-lambda~value\char34}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${\Varid{phi1Var}\;(\Conid{EVar}\;\Varid{s})\mathrel{=}\mathbf{do}\;\{\mskip1.5mu \Varid{v}\leftarrow \Varid{asks}\;(\Varid{lookupAbsVal}\;\Varid{s})}$\\
+${\hskip10.50em\relax;\mathbf{case}\;\Varid{v}\;\mathbf{of}}$\\
+${\hskip10.50em\relax\phantom{;\mbox{}}(\Conid{Just}\;\Varid{x})\to \Varid{return}\;\Varid{x}}$\\
+${\hskip10.50em\relax\phantom{;\mbox{}}\Conid{Nothing}\to \Varid{error}\;\text{\tt \char34 Variable~not~found\char34}}$\\
+${\hskip10.50em\relax\mskip1.5mu\}}$
+\end{tabbing}
+Finally, create the algebra structures for each term and sum them
+together to create the term algebra.  The helper function \ensuremath{\Varid{evalPar}} is
+identical to \ensuremath{\Varid{evalFun}} defined previously except it uses the abstract
+interpreter.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{term1Alg}\mathrel{=}(\Conid{AlgC}\;\Varid{phi1Const})}$\\
+${\phantom{\Varid{term1Alg}\mbox{}}\mathbin{@+@}(\Conid{AlgAdd}\;\Varid{phi1Add}\;\Varid{phi1Sub})}$\\
+${\phantom{\Varid{term1Alg}\mbox{}}\mathbin{@+@}(\Conid{AlgMult}\;\Varid{phi1Mult}\;\Varid{phi1Div})}$\\
+${\phantom{\Varid{term1Alg}\mbox{}}\mathbin{@+@}(\Conid{AlgFun}\;\Varid{phi1Lambda}\;\Varid{phi1App}\;\Varid{phi1Var})}$\\
+${}$\\
+${\Varid{evalPar}\mathrel{=}\Varid{runReader}\mathbin{\circ}(\Varid{cata}\;\Varid{term1Alg})}$
+\end{tabbing}
+We're done.  Now we can use the same terms as before to test the new
+abstract interpreter.
+
+\section{Type Checking as Interpretation}
+
+Now let's have even more fun.  Using the same algebraic structure, we
+can define a type checker for our tiny language by once again defining
+a new value space and associated \ensuremath{\Varid{\phi}} functions.  We'll leave it to
+the reader to determine what's going on here.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{TyValue}}$\\
+${\hskip2.00em\relax\mathrel{=}\Conid{TyInt}}$\\
+${\hskip2.00em\relax\mid \Conid{TyValue}\mathbin{:->:}\Conid{TyValue}}$\\
+${\hskip2.00em\relax\phantom{\mid \mbox{}}\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$\\
+${}$\\
+${\mathbf{data}\;\Varid{\Gamma}\mathrel{=}\Varid{\Gamma}\{\mskip1.5mu \Varid{\gamma}\mathbin{::}[\mskip1.5mu (\Conid{String},\Conid{TyValue})\mskip1.5mu]\mskip1.5mu\}}$\\
+${}$\\
+${\Varid{lookupTy}\;\Varid{name}\;\Varid{gam}\mathrel{=}\Varid{lookup}\;\Varid{name}\;(\Varid{\gamma}\;\Varid{gam})}$\\
+${}$\\
+${\Varid{addBinding}\;\Varid{b}\;\Varid{gam}\mathrel{=}\Varid{\Gamma}\{\mskip1.5mu \Varid{\gamma}\mathrel{=}\Varid{b}\mathbin{:}(\Varid{\gamma}\;\Varid{gam})\mskip1.5mu\}}$\\
+${}$\\
+${\mathbf{type}\;\Conid{TyMonad}\mathrel{=}\Conid{Reader}\;\Varid{\Gamma}\;\Conid{TyValue}}$
+\end{tabbing}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{tyConst}\;(\Conid{EConst}\;\Varid{x})\mathrel{=}\Varid{return}\;\Conid{TyInt}}$\\
+${}$\\
+${\Varid{tPlus}\;\Conid{TyInt}\;\Conid{TyInt}\mathrel{=}\Conid{TyInt}}$\\
+${\Varid{tPlus}\;(\anonymous \mathbin{:->:}\anonymous )\;\anonymous \mathrel{=}\Varid{error}\;\text{\tt \char34 Cannot~add~function~value\char34}}$\\
+${\Varid{tPlus}\;\anonymous \;(\anonymous \mathbin{:->:}\anonymous )\mathrel{=}\Varid{error}\;\text{\tt \char34 Cannot~add~function~value\char34}}$\\
+${}$\\
+${\Varid{tSub}\;\Conid{TyInt}\;\Conid{TyInt}\mathrel{=}\Conid{TyInt}}$\\
+${\Varid{tSub}\;(\anonymous \mathbin{:->:}\anonymous )\;\anonymous \mathrel{=}\Varid{error}\;\text{\tt \char34 Cannot~subtract~function~value\char34}}$\\
+${\Varid{tSub}\;\anonymous \;(\anonymous \mathbin{:->:}\anonymous )\mathrel{=}\Varid{error}\;\text{\tt \char34 Cannot~subtract~function~value\char34}}$\\
+${}$\\
+${\Varid{tyAdd}\;(\Conid{EAdd}\;\Varid{x1}\;\Varid{x2})\mathrel{=}\Varid{liftM2}\;\Varid{tPlus}\;\Varid{x1}\;\Varid{x2}}$\\
+${\Varid{tySub}\;(\Conid{ESub}\;\Varid{x1}\;\Varid{x2})\mathrel{=}\Varid{liftM2}\;\Varid{tSub}\;\Varid{x1}\;\Varid{x2}}$\\
+${}$\\
+${\Varid{tMult}\;\Conid{TyInt}\;\Conid{TyInt}\mathrel{=}\Conid{TyInt}}$\\
+${\Varid{tMult}\;(\anonymous \mathbin{:->:}\anonymous )\;\anonymous \mathrel{=}\Varid{error}\;\text{\tt \char34 Cannot~multiply~function~value\char34}}$\\
+${\Varid{tMult}\;\anonymous \;(\anonymous \mathbin{:->:}\anonymous )\mathrel{=}\Varid{error}\;\text{\tt \char34 Cannot~multiply~function~value\char34}}$\\
+${}$\\
+${\Varid{tDiv}\;\Conid{TyInt}\;\Conid{TyInt}\mathrel{=}\Conid{TyInt}}$\\
+${\Varid{tDiv}\;(\anonymous \mathbin{:->:}\anonymous )\;\anonymous \mathrel{=}\Varid{error}\;\text{\tt \char34 Cannot~divide~function~value\char34}}$\\
+${\Varid{tDiv}\;\anonymous \;(\anonymous \mathbin{:->:}\anonymous )\mathrel{=}\Varid{error}\;\text{\tt \char34 Cannot~divide~function~value\char34}}$\\
+${}$\\
+${\Varid{tyMult}\;(\Conid{EMult}\;\Varid{x1}\;\Varid{x2})\mathrel{=}\Varid{liftM2}\;\Varid{tMult}\;\Varid{x1}\;\Varid{x2}}$\\
+${\Varid{tyDiv}\;(\Conid{EDiv}\;\Varid{x1}\;\Varid{x2})\mathrel{=}\Varid{liftM2}\;\Varid{tDiv}\;\Varid{x1}\;\Varid{x2}}$\\
+${}$\\
+${\Varid{tyLambda}\;(\Conid{ELambda}\;\Varid{s}\;\Varid{ty}\;\Varid{t})\mathrel{=}}$\\
+${\hskip2.00em\relax\mathbf{do}\;\{\mskip1.5mu \Varid{g}\leftarrow \Varid{ask}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{t'}\leftarrow (\Varid{local}\;(\Varid{const}\;(\Varid{addBinding}\;(\Varid{s},\Conid{TyInt})\;\Varid{g}))\;\Varid{t})}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{return}\;(\Varid{ty}\mathbin{:->:}\Varid{t'})}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${\Varid{tyApp}\;(\Conid{EApp}\;\Varid{x1}\;\Varid{x2})\mathrel{=}}$\\
+${\hskip2.00em\relax\mathbf{do}\;\{\mskip1.5mu \Varid{x1'}\leftarrow \Varid{x1}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{x2'}\leftarrow \Varid{x2}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\mathbf{case}\;\Varid{x1'}\;\mathbf{of}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}(\Varid{t1}\mathbin{:->:}\Varid{t2})\to \mathbf{if}\;(\Varid{t1}\equiv \Varid{x2'})}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\phantom{(\Varid{t1}\mathbin{:->:}\Varid{t2})\to \mbox{}}\mathbf{then}\;(\Varid{return}\;\Varid{t2})}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\phantom{(\Varid{t1}\mathbin{:->:}\Varid{t2})\to \mbox{}}\mathbf{else}\;(\Varid{error}\;\text{\tt \char34 Input~parameter~of~wrong~type\char34})}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\anonymous \to \Varid{error}\;\text{\tt \char34 Cannot~apply~non-lambda~value\char34}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${\Varid{tyVar}\;(\Conid{EVar}\;\Varid{s})\mathrel{=}\mathbf{do}\;\{\mskip1.5mu \Varid{v}\leftarrow \Varid{asks}\;(\Varid{lookupTy}\;\Varid{s})}$\\
+${\phantom{\Varid{tyVar}\;(\Conid{EVar}\;\Varid{s})\mathrel{=}\mathbf{do}\;\{\mskip1.5mu \mbox{}};\mathbf{case}\;\Varid{v}\;\mathbf{of}}$\\
+${\phantom{\Varid{tyVar}\;(\Conid{EVar}\;\Varid{s})\mathrel{=}\mathbf{do}\;\{\mskip1.5mu \mbox{}}(\Conid{Just}\;\Varid{x})\to \Varid{return}\;\Varid{x}}$\\
+${\phantom{\Varid{tyVar}\;(\Conid{EVar}\;\Varid{s})\mathrel{=}\mathbf{do}\;\{\mskip1.5mu \mbox{}}\Conid{Nothing}\to \Varid{error}\;\text{\tt \char34 Variable~not~found\char34}}$\\
+${\phantom{\Varid{tyVar}\;(\Conid{EVar}\;\Varid{s})\mathrel{=}\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${\Varid{tyAlg}\mathrel{=}(\Conid{AlgC}\;\Varid{tyConst})}$\\
+${\hskip5.00em\relax\mathbin{@+@}(\Conid{AlgAdd}\;\Varid{tyAdd}\;\Varid{tySub})}$\\
+${\hskip5.00em\relax\mathbin{@+@}(\Conid{AlgMult}\;\Varid{tyMult}\;\Varid{tyDiv})}$\\
+${\hskip5.00em\relax\mathbin{@+@}(\Conid{AlgFun}\;\Varid{tyLambda}\;\Varid{tyApp}\;\Varid{tyVar})}$\\
+${}$\\
+${\Varid{typeof}\mathrel{=}\Varid{runReader}\mathbin{\circ}(\Varid{cata}\;\Varid{tyAlg})}$
+\end{tabbing}
+That's it.  The type checker in just over a page.  Not bad at all.
+
+\section{A Moment of Soundness}
+
+One more interesting thing before we quit is evaluating soundness of
+the abstract interpretation.  Specifically, does applying the
+abstraction function after interpretation result in the same value as
+abstract interpretation?  If so, then $\alpha(\phi_c(m))=\phi_a(m)$
+where $\phi_c$ is concrete interpretation and $\phi_a$ is abstract
+interpretation.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{soundTest}\;\Varid{c}\;\Varid{a}\;\Varid{alpha}\;\Varid{x}\mathrel{=}\mathbf{do}\;\{\mskip1.5mu \Varid{x'}\leftarrow \Varid{cata}\;\Varid{c}\;\Varid{x}}$\\
+${\phantom{\Varid{soundTest}\;\Varid{c}\;\Varid{a}\;\Varid{alpha}\;\Varid{x}\mathrel{=}\mathbf{do}\;\mbox{}};\Varid{x''}\leftarrow \Varid{cata}\;\Varid{a}\;\Varid{x}}$\\
+${\phantom{\Varid{soundTest}\;\Varid{c}\;\Varid{a}\;\Varid{alpha}\;\Varid{x}\mathrel{=}\mathbf{do}\;\mbox{}};\Varid{return}\;(\Varid{x''}\equiv (\Varid{alpha}\;\Varid{x'}))}$\\
+${\phantom{\Varid{soundTest}\;\Varid{c}\;\Varid{a}\;\Varid{alpha}\;\Varid{x}\mathrel{=}\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${\Varid{sound}\;\Varid{x}\mathrel{=}\mathbf{case}\;\Varid{v}\;\mathbf{of}}$\\
+${\phantom{\Varid{sound}\;\Varid{x}\mathrel{=}\mbox{}}(\Conid{ValNum}\;\Varid{a})\to \mathbf{case}\;\Varid{av}\;\mathbf{of}}$\\
+${\phantom{\Varid{sound}\;\Varid{x}\mathrel{=}\mbox{}}\phantom{(\Conid{ValNum}\;\Varid{a})\to \mbox{}}\Varid{c}\mathord{@}(\Conid{AbsValNum}\;\Varid{b})\to \Varid{alpha}\;\Varid{a}\equiv \Varid{c}}$\\
+${\phantom{\Varid{sound}\;\Varid{x}\mathrel{=}\mbox{}}\phantom{(\Conid{ValNum}\;\Varid{a})\to \mbox{}}\anonymous \to \Conid{False}}$\\
+${\phantom{\Varid{sound}\;\Varid{x}\mathrel{=}\mbox{}}(\Conid{ValLambda}\;\anonymous )\to \mathbf{case}\;\Varid{av}\;\mathbf{of}}$\\
+${\phantom{\Varid{sound}\;\Varid{x}\mathrel{=}\mbox{}}\phantom{(\Conid{ValLambda}\;\anonymous )\to \mbox{}}(\Conid{AbsValLambda}\;\anonymous )\to \Varid{error}\;\text{\tt \char34 Cannot~compare~functions\char34}}$\\
+${\phantom{\Varid{sound}\;\Varid{x}\mathrel{=}\mbox{}}\phantom{(\Conid{ValLambda}\;\anonymous )\to \mbox{}}\anonymous \to \Conid{False}}$\\
+${\hskip2.00em\relax\mathbf{where}\;\Varid{v}\mathrel{=}(\Varid{evalFun}\;\Varid{x}\;\Conid{Env}\{\mskip1.5mu \Varid{variables}\mathrel{=}[\mskip1.5mu \mskip1.5mu]\mskip1.5mu\});}$\\
+${\hskip2.00em\relax\phantom{\mathbf{where}\;\mbox{}}\Varid{av}\mathrel{=}(\Varid{evalPar}\;\Varid{x}\;\Conid{AbsEnv}\{\mskip1.5mu \Varid{absVariables}\mathrel{=}[\mskip1.5mu \mskip1.5mu]\mskip1.5mu\})}$
+\end{tabbing}
+\section{Testing Functions}
+
+The remaining definitions are helper functions for creating terms and
+calling \ensuremath{\Varid{cata}} to perform evaluation.  All are worth looking at to see
+the structure of terms and to see the use of monads during evaluation.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{sright}\mathrel{=}\Conid{S}\mathbin{\circ}\Conid{Right}}$\\
+${}$\\
+${\Varid{sleft}\mathrel{=}\Conid{S}\mathbin{\circ}\Conid{Left}}$\\
+${}$\\
+${\Varid{term1}\mathrel{=}\Varid{mkEConst}\;\mathrm{1}}$\\
+${\Varid{term2}\mathrel{=}\Varid{mkEAdd}\;\Varid{term1}\;\Varid{term1}}$\\
+${\Varid{term3}\mathrel{=}\Varid{mkEMult}\;\Varid{term2}\;\Varid{term2}}$\\
+${\Varid{term4}\mathrel{=}\Varid{mkESub}\;\Varid{term1}\;\Varid{term1}}$\\
+${\Varid{term5}\mathrel{=}\Varid{mkEDiv}\;\Varid{term1}\;\Varid{term1}}$\\
+${\Varid{term6}\mathrel{=}\Varid{mkEVar}\;\text{\tt \char34 x\char34}}$\\
+${\Varid{term7}\mathrel{=}\Varid{mkELambda}\;\text{\tt \char34 x\char34}\;\Conid{TyInt}\;\Varid{term6}}$\\
+${\Varid{term8}\mathrel{=}\Varid{mkEApp}\;\Varid{term7}\;\Varid{term1}}$\\
+${\Varid{term9}\mathrel{=}\Varid{mkELambda}\;\text{\tt \char34 x\char34}\;\Conid{TyInt}\;(\Varid{mkEAdd}\;\Varid{term6}\;\Varid{term6})}$\\
+${\Varid{term10}\mathrel{=}\Varid{mkEApp}\;\Varid{term9}\;\Varid{term1}}$\\
+${\Varid{term11}\mathrel{=}\Varid{mkELambda}\;\text{\tt \char34 x\char34}\;\Conid{TyInt}\;(\Varid{mkELambda}\;\text{\tt \char34 y\char34}\;\Conid{TyInt}\;(\Varid{mkEAdd}\;\Varid{term1}\;\Varid{term1}))}$\\
+${\Varid{term12}\mathrel{=}\Varid{mkEApp}\;(\Varid{mkEApp}\;\Varid{term11}\;\Varid{term1})\;\Varid{term1}}$\\
+${}$\\
+${\Varid{emptyG}\mathrel{=}\Varid{\Gamma}\{\mskip1.5mu \Varid{\gamma}\mathrel{=}[\mskip1.5mu \mskip1.5mu]\mskip1.5mu\}}$\\
+${\Varid{emptyE}\mathrel{=}\Conid{Env}\{\mskip1.5mu \Varid{variables}\mathrel{=}[\mskip1.5mu \mskip1.5mu]\mskip1.5mu\}}$\\
+${\Varid{emptyAE}\mathrel{=}\Conid{AbsEnv}\{\mskip1.5mu \Varid{absVariables}\mathrel{=}[\mskip1.5mu \mskip1.5mu]\mskip1.5mu\}}$
+\end{tabbing}
+I always forget the definitions of \ensuremath{\Varid{liftM}} and \ensuremath{\Varid{liftM2}}, so I'll
+include them here in a specification block for reference.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mbox{\qquad-{}-  Defined in Control.Monad}}$\\
+${\Varid{liftM2}\;\Varid{f}\;\Varid{m}_1\;\Varid{m}_2\mathrel{=}\mathbf{do}\;\Varid{x1}\leftarrow \Varid{m}_1}$\\
+${\phantom{\Varid{liftM2}\;\Varid{f}\;\Varid{m}_1\;\Varid{m}_2\mathrel{=}\mathbf{do}\;\mbox{}}\Varid{x2}\leftarrow \Varid{m}_2}$\\
+${\phantom{\Varid{liftM2}\;\Varid{f}\;\Varid{m}_1\;\Varid{m}_2\mathrel{=}\mathbf{do}\;\mbox{}}\Varid{return}\;(\Varid{f}\;\Varid{x1}\;\Varid{x2})}$\\
+${}$\\
+${\Varid{liftM}\;\Varid{f}\;\Varid{m}_1\mathrel{=}\mathbf{do}\;\Varid{x}\leftarrow \Varid{m}}$\\
+${\phantom{\Varid{liftM}\;\Varid{f}\;\Varid{m}_1\mathrel{=}\mathbf{do}\;\mbox{}}\Varid{return}\;(\Varid{f}\;\Varid{x})}$
+\end{tabbing}
+This does not work, so uncomment at your own risk.  It's supposed to
+mimic SubSum from LangUtils, but insists on a fully instantiated type
+instead of a type constructor.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{toTmLang}\mathbin{::}(\Conid{SubType}\;\Varid{f}\;\Conid{TermType})\Rightarrow \Varid{f}\;\Conid{TermLang}\to \Conid{TermLang}}$\\
+${\Varid{toTmLang}\mathrel{=}\Varid{\uparrow}}$
+\end{tabbing}
+\end{document}

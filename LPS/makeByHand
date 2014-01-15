@@ -1,0 +1,280 @@
+
+# Standard defs:
+OBJS = $(SRCS:.hs=.o)
+GHC  = ghc
+CC   = gcc
+RM   = rm -f
+
+BASICFLAGS = -fglasgow-exts \
+	     -fallow-overlapping-instances \
+	     -fallow-undecidable-instances
+
+BASICFLAGS += -Wall
+
+FLAGS = $(BASICFLAGS)
+
+# Specific
+
+SRCS =	Basics.lhs \
+	Id.lhs Initial.lhs ShowMonad.lhs \
+	MonadT.lhs ErrorT.lhs EnvT.lhs StateT.lhs DebugT.lhs IOT.lhs \
+	Fix.lhs MFix.lhs SubType.lhs SFunctor.lhs SemMonad.lhs \
+	TermB.lhs TermCMP.lhs TermD.lhs TermF.lhs TermN.lhs TermP.lhs TermR.lhs TermV.lhs \
+	Shell.lhs Interp.lhs Lang.lhs Main.lhs \
+	Error.lhs HasName.lhs HasParser.lhs \
+	Heap.lhs Memory.lhs Table.lhs \
+	ParserUtils.lhs ShowUtils.lhs IOUtils.lhs \
+	ParseLib.lhs \
+
+OBJS = 	Basics.o \
+	Id.o Initial.o ShowMonad.o \
+	MonadT.o ErrorT.o EnvT.o StateT.o DebugT.o IOT.o \
+	Fix.o MFix.o SubType.o SFunctor.o SemMonad.o \
+	TermB.o TermCMP.o TermD.o TermF.o TermN.o TermP.o TermR.o TermV.o \
+	Shell.o Interp.o Lang.o Main.o \
+	Error.o HasName.o HasParser.o \
+	Heap.o Memory.o Table.o \
+	ParserUtils.o ShowUtils.o IOUtils.o \
+	ParseLib.o \
+
+lps : $(OBJS)
+	$(RM) $@
+	$(GHC) -o $@ $(FLAGS) $(OBJS)
+
+### Boilerplate GHC stuff
+
+.SUFFIXES	: .lhs .hs .hi .o
+
+depend :: 	$(SRC)
+		$(GHC) -M $(DEPENDFLAGS) $(SRCS)
+
+clean ::
+	$(RM) *.o *.hi *.exe *~
+
+%.hi		: %.o
+		@:
+
+%.o		: %.lhs
+		$(RM) $@
+		$(GHC) $(FLAGS) -c $< 
+
+# DO NOT DELETE: Beginning of Haskell dependencies
+Basics.o : Basics.lhs
+Id.o : Id.lhs
+Id.o : ./ShowMonad.hi
+Initial.o : Initial.lhs
+ShowMonad.o : ShowMonad.lhs
+MonadT.o : MonadT.lhs
+ErrorT.o : ErrorT.lhs
+ErrorT.o : ./MonadT.hi
+ErrorT.o : ./ShowMonad.hi
+ErrorT.o : ./Id.hi
+ErrorT.o : ./Error.hi
+EnvT.o : EnvT.lhs
+EnvT.o : ./MonadT.hi
+EnvT.o : ./ShowMonad.hi
+EnvT.o : ./Initial.hi
+StateT.o : StateT.lhs
+StateT.o : ./MonadT.hi
+StateT.o : ./ShowMonad.hi
+StateT.o : ./Initial.hi
+DebugT.o : DebugT.lhs
+DebugT.o : ./Initial.hi
+DebugT.o : ./ShowMonad.hi
+DebugT.o : ./Basics.hi
+DebugT.o : ./ShowUtils.hi
+DebugT.o : ./StateT.hi
+IOT.o : IOT.lhs
+IOT.o : ./Basics.hi
+IOT.o : ./Initial.hi
+IOT.o : ./MonadT.hi
+IOT.o : ./ShowMonad.hi
+IOT.o : ./ShowUtils.hi
+IOT.o : ./StateT.hi
+Fix.o : Fix.lhs
+MFix.o : MFix.lhs
+MFix.o : ./Fix.hi
+SubType.o : SubType.lhs
+SFunctor.o : SFunctor.lhs
+SFunctor.o : ./SubType.hi
+SFunctor.o : ./HasParser.hi
+SFunctor.o : ./ParseLib.hi
+SFunctor.o : ./Fix.hi
+SFunctor.o : ./MFix.hi
+SemMonad.o : SemMonad.lhs
+SemMonad.o : ./HasName.hi
+SemMonad.o : ./ErrorT.hi
+SemMonad.o : ./StateT.hi
+SemMonad.o : ./EnvT.hi
+SemMonad.o : ./IOT.hi
+SemMonad.o : ./Table.hi
+SemMonad.o : ./Heap.hi
+SemMonad.o : ./Basics.hi
+SemMonad.o : ./SubType.hi
+TermB.o : TermB.lhs
+TermB.o : ./Fix.hi
+TermB.o : ./MFix.hi
+TermB.o : ./SubType.hi
+TermB.o : ./ErrorT.hi
+TermB.o : ./HasName.hi
+TermB.o : ./SemMonad.hi
+TermB.o : ./ParseLib.hi
+TermB.o : ./HasParser.hi
+TermB.o : ./ShowUtils.hi
+TermCMP.o : TermCMP.lhs
+TermCMP.o : ./Fix.hi
+TermCMP.o : ./MFix.hi
+TermCMP.o : ./SubType.hi
+TermCMP.o : ./ErrorT.hi
+TermCMP.o : ./HasName.hi
+TermCMP.o : ./SemMonad.hi
+TermCMP.o : ./ParseLib.hi
+TermCMP.o : ./HasParser.hi
+TermCMP.o : ./ShowUtils.hi
+TermD.o : TermD.lhs
+TermD.o : ./Basics.hi
+TermD.o : ./Fix.hi
+TermD.o : ./MFix.hi
+TermD.o : ./SubType.hi
+TermD.o : ./ErrorT.hi
+TermD.o : ./StateT.hi
+TermD.o : ./EnvT.hi
+TermD.o : ./HasName.hi
+TermD.o : ./SemMonad.hi
+TermD.o : ./ParseLib.hi
+TermD.o : ./HasParser.hi
+TermD.o : ./ShowUtils.hi
+TermD.o : ./Heap.hi
+TermD.o : ./Table.hi
+TermF.o : TermF.lhs
+TermF.o : ./Fix.hi
+TermF.o : ./Basics.hi
+TermF.o : ./HasName.hi
+TermF.o : ./MFix.hi
+TermF.o : ./SubType.hi
+TermF.o : ./ErrorT.hi
+TermF.o : ./StateT.hi
+TermF.o : ./EnvT.hi
+TermF.o : ./Table.hi
+TermF.o : ./Heap.hi
+TermF.o : ./SemMonad.hi
+TermF.o : ./ParseLib.hi
+TermF.o : ./HasParser.hi
+TermF.o : ./IOT.hi
+TermN.o : TermN.lhs
+TermN.o : ./Id.hi
+TermN.o : ./Fix.hi
+TermN.o : ./SubType.hi
+TermN.o : ./ErrorT.hi
+TermN.o : ./HasName.hi
+TermN.o : ./SemMonad.hi
+TermN.o : ./ParseLib.hi
+TermN.o : ./ShowUtils.hi
+TermN.o : ./HasParser.hi
+TermN.o : ./MFix.hi
+TermN.o : ./Fix.hi
+TermP.o : TermP.lhs
+TermP.o : ./Basics.hi
+TermP.o : ./Fix.hi
+TermP.o : ./MFix.hi
+TermP.o : ./SubType.hi
+TermP.o : ./ErrorT.hi
+TermP.o : ./StateT.hi
+TermP.o : ./EnvT.hi
+TermP.o : ./IOT.hi
+TermP.o : ./Table.hi
+TermP.o : ./Heap.hi
+TermP.o : ./HasName.hi
+TermP.o : ./ParseLib.hi
+TermP.o : ./HasParser.hi
+TermP.o : ./SemMonad.hi
+TermR.o : TermR.lhs
+TermR.o : ./HasName.hi
+TermR.o : ./StateT.hi
+TermR.o : ./Fix.hi
+TermR.o : ./MFix.hi
+TermR.o : ./SubType.hi
+TermR.o : ./ErrorT.hi
+TermR.o : ./ParseLib.hi
+TermR.o : ./ShowUtils.hi
+TermR.o : ./HasParser.hi
+TermR.o : ./Basics.hi
+TermR.o : ./Heap.hi
+TermR.o : ./SemMonad.hi
+TermV.o : TermV.lhs
+TermV.o : ./Basics.hi
+TermV.o : ./HasName.hi
+TermV.o : ./StateT.hi
+TermV.o : ./Fix.hi
+TermV.o : ./MFix.hi
+TermV.o : ./SubType.hi
+TermV.o : ./ErrorT.hi
+TermV.o : ./EnvT.hi
+TermV.o : ./Table.hi
+TermV.o : ./Heap.hi
+TermV.o : ./SemMonad.hi
+TermV.o : ./ParseLib.hi
+TermV.o : ./HasParser.hi
+TermV.o : ./IOT.hi
+Shell.o : Shell.lhs
+Shell.o : ./Error.hi
+Shell.o : ./Lang.hi
+Shell.o : ./ParseLib.hi
+Shell.o : ./ParserUtils.hi
+Shell.o : ./HasParser.hi
+Interp.o : Interp.lhs
+Interp.o : ./Fix.hi
+Interp.o : ./MFix.hi
+Lang.o : Lang.lhs
+Lang.o : ./Heap.hi
+Lang.o : ./Fix.hi
+Lang.o : ./TermN.hi
+Lang.o : ./TermV.hi
+Lang.o : ./TermB.hi
+Lang.o : ./TermCMP.hi
+Lang.o : ./TermR.hi
+Lang.o : ./TermP.hi
+Lang.o : ./TermF.hi
+Lang.o : ./TermD.hi
+Lang.o : ./Table.hi
+Lang.o : ./EnvT.hi
+Lang.o : ./DebugT.hi
+Lang.o : ./StateT.hi
+Lang.o : ./ErrorT.hi
+Lang.o : ./IOT.hi
+Lang.o : ./Id.hi
+Lang.o : ./HasName.hi
+Lang.o : ./Initial.hi
+Lang.o : ./SubType.hi
+Lang.o : ./Error.hi
+Lang.o : ./SFunctor.hi
+Lang.o : ./Interp.hi
+Lang.o : ./HasParser.hi
+Main.o : Main.lhs
+Main.o : ./Lang.hi
+Main.o : ./Shell.hi
+Main.o : ./IOUtils.hi
+Error.o : Error.lhs
+HasName.o : HasName.lhs
+HasName.o : ./SubType.hi
+HasParser.o : HasParser.lhs
+HasParser.o : ./ParseLib.hi
+HasParser.o : ./Fix.hi
+Heap.o : Heap.lhs
+Heap.o : ./ErrorT.hi
+Heap.o : ./StateT.hi
+Heap.o : ./Initial.hi
+Heap.o : ./Basics.hi
+Heap.o : ./Memory.hi
+Memory.o : Memory.lhs
+Memory.o : ./Basics.hi
+Table.o : Table.lhs
+Table.o : ./ErrorT.hi
+Table.o : ./Initial.hi
+Table.o : ./Basics.hi
+ParserUtils.o : ParserUtils.lhs
+ParserUtils.o : ./ParseLib.hi
+ShowUtils.o : ShowUtils.lhs
+IOUtils.o : IOUtils.lhs
+ParseLib.o : ParseLib.lhs
+# DO NOT DELETE: End of Haskell dependencies

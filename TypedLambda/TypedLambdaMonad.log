@@ -1,0 +1,139 @@
+This is pdfTeX, Version 3.14159-1.10b (Web2C 7.4.5) (format=pdflatex 2003.12.11)  12 AUG 2004 17:31
+**TypedLambdaMonad
+(./TypedLambdaMonad.tex{/sw/share/texmf/pdftex/config/pdftex.cfg}
+LaTeX2e <2001/06/01>
+Babel <v3.7h> and hyphenation patterns for american, french, german, ngerman, n
+ohyphenation, loaded.
+(/sw/share/texmf/tex/latex/base/article.cls
+Document Class: article 2001/04/21 v1.4e Standard LaTeX document class
+(/sw/share/texmf/tex/latex/base/size10.clo
+File: size10.clo 2001/04/21 v1.4e Standard LaTeX file (size option)
+)
+\c@part=\count79
+\c@section=\count80
+\c@subsection=\count81
+\c@subsubsection=\count82
+\c@paragraph=\count83
+\c@subparagraph=\count84
+\c@figure=\count85
+\c@table=\count86
+\abovecaptionskip=\skip41
+\belowcaptionskip=\skip42
+\bibindent=\dimen102
+)
+(/sw/share/texmf/tex/latex/misc/url.sty
+\Urlmuskip=\muskip10
+Package: url 1999/03/28  ver 1.5x  Verb mode for urls, etc.
+) (/Users/alex/lib/tex/proof.sty
+\inferLineSkip=\dimen103
+\inferLabelSkip=\dimen104
+\@LeftOffset=\dimen105
+\@RightOffset=\dimen106
+\@SavedLeftOffset=\dimen107
+\UpperWidth=\dimen108
+\LowerWidth=\dimen109
+\LowerHeight=\dimen110
+\UpperLeftOffset=\dimen111
+\UpperRightOffset=\dimen112
+\UpperCenter=\dimen113
+\LowerCenter=\dimen114
+\UpperAdjust=\dimen115
+\RuleAdjust=\dimen116
+\LowerAdjust=\dimen117
+\RuleWidth=\dimen118
+\HLabelAdjust=\dimen119
+\VLabelAdjust=\dimen120
+\WidthAdjust=\dimen121
+\@UpperPart=\box26
+\@LowerPart=\box27
+\@LabelPart=\box28
+\ResultBox=\box29
+)
+(/sw/share/texmf/tex/latex/preprint/fullpage.sty
+Package: fullpage 1999/02/23 1.1 (PWD)
+\FP@margin=\skip43
+)
+(/sw/share/texmf/tex/latex/amsmath/amstext.sty
+Package: amstext 2000/06/29 v2.01
+
+(/sw/share/texmf/tex/latex/amsmath/amsgen.sty
+File: amsgen.sty 1999/11/30 v2.0
+\@emptytoks=\toks14
+\ex@=\dimen122
+))
+(/sw/share/texmf/tex/latex/amsfonts/amssymb.sty
+Package: amssymb 2002/01/22 v2.2d
+
+(/sw/share/texmf/tex/latex/amsfonts/amsfonts.sty
+Package: amsfonts 2001/10/25 v2.2f
+\symAMSa=\mathgroup4
+\symAMSb=\mathgroup5
+LaTeX Font Info:    Overwriting math alphabet `\mathfrak' in version `bold'
+(Font)                  U/euf/m/n --> U/euf/b/n on input line 132.
+))
+(/sw/share/texmf/tex/latex/misc/stmaryrd.sty
+Package: stmaryrd 1994/03/03 St Mary's Road symbol package
+\symstmry=\mathgroup6
+LaTeX Font Info:    Overwriting symbol font `stmry' in version `bold'
+(Font)                  U/stmry/m/n --> U/stmry/b/n on input line 89.
+)
+\lwidth=\skip44
+\cwidth=\skip45
+ (./TypedLambdaMonad.aux)
+\openout1 = `TypedLambdaMonad.aux'.
+
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 71.
+LaTeX Font Info:    ... okay on input line 71.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 71.
+LaTeX Font Info:    ... okay on input line 71.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 71.
+LaTeX Font Info:    ... okay on input line 71.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 71.
+LaTeX Font Info:    ... okay on input line 71.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 71.
+LaTeX Font Info:    ... okay on input line 71.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 71.
+LaTeX Font Info:    ... okay on input line 71.
+LaTeX Font Info:    Try loading font information for U+msa on input line 73.
+
+(/sw/share/texmf/tex/latex/amsfonts/umsa.fd
+File: umsa.fd 2002/01/19 v2.2g AMS font definitions
+)
+LaTeX Font Info:    Try loading font information for U+msb on input line 73.
+
+(/sw/share/texmf/tex/latex/amsfonts/umsb.fd
+File: umsb.fd 2002/01/19 v2.2g AMS font definitions
+)
+LaTeX Font Info:    Try loading font information for U+stmry on input line 73.
+
+(/sw/share/texmf/tex/latex/misc/ustmry.fd) [1
+
+{/sw/share/texmf/dvips/config/pdftex.map}] [2] [3] [4] [5] [6] [7] [8] [9] [10]
+ [11] (./TypedLambdaMonad.bbl)
+[12] (./TypedLambdaMonad.aux) ) 
+Here is how much of TeX's memory you used:
+ 910 strings out of 95437
+ 10148 string characters out of 1190294
+ 55914 words of memory out of 1000001
+ 3915 multiletter control sequences out of 10000+50000
+ 15975 words of font info for 63 fonts, out of 500000 for 1000
+ 14 hyphenation exceptions out of 1000
+ 23i,11n,24p,354b,258s stack positions out of 1500i,500n,5000p,200000b,5000s
+ 83 PDF objects out of 300000
+ 0 named destinations out of 131072
+ 0 words of extra memory for PDF output out of 65536
+{/sw/share/texmf/dvips/tetex/aae443f0.enc}</sw/s
+hare/texmf/fonts/type1/bluesky/cm/cmmi7.pfb>{/sw/share/texmf/dvips/tetex/f7b6d3
+20.enc}</sw/share/texmf/fonts/type1/bluesky/cm/cmbx10.pfb>{/sw/share/texmf/dvip
+s/tetex/0ef0afca.enc}</sw/share/texmf/fonts/type1/bluesky/cm/cmcsc10.pfb>{/sw/s
+hare/texmf/dvips/tetex/bbad153f.enc}</sw/share/texmf/fonts/type1/bluesky/cm/cms
+y5.pfb></sw/share/texmf/fonts/type1/bluesky/cm/cmr7.pfb>{/sw/share/texmf/dvips/
+tetex/09fbbfac.enc}</sw/share/texmf/fonts/type1/bluesky/cm/cmtt10.pfb></sw/shar
+e/texmf/fonts/type1/bluesky/cm/cmsy10.pfb>{/sw/share/texmf/dvips/tetex/74afc74c
+.enc}</sw/share/texmf/fonts/type1/bluesky/cm/cmti10.pfb></sw/share/texmf/fonts/
+type1/bluesky/cm/cmsy7.pfb></sw/share/texmf/fonts/type1/bluesky/cm/cmmi10.pfb><
+/sw/share/texmf/fonts/type1/bluesky/cm/cmr10.pfb></sw/share/texmf/fonts/type1/b
+luesky/cm/cmbx12.pfb></sw/share/texmf/fonts/type1/bluesky/cm/cmtt12.pfb></sw/sh
+are/texmf/fonts/type1/bluesky/cm/cmr12.pfb></sw/share/texmf/fonts/type1/bluesky
+/cm/cmr17.pfb>
+Output written on TypedLambdaMonad.pdf (12 pages, 130468 bytes).

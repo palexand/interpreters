@@ -1,0 +1,149 @@
+\documentclass[10pt]{article}
+
+\makeatletter
+
+\usepackage{amstext}
+\usepackage{amssymb}
+\usepackage{stmaryrd}
+\DeclareFontFamily{OT1}{cmtex}{}
+\DeclareFontShape{OT1}{cmtex}{m}{n}
+  {<5><6><7><8>cmtex8
+   <9>cmtex9
+   <10><10.95><12><14.4><17.28><20.74><24.88>cmtex10}{}
+\DeclareFontShape{OT1}{cmtex}{m}{it}
+  {<-> ssub * cmtt/m/it}{}
+\newcommand{\texfamily}{\fontfamily{cmtex}\selectfont}
+\DeclareFontShape{OT1}{cmtt}{bx}{n}
+  {<5><6><7><8>cmtt8
+   <9>cmbtt9
+   <10><10.95><12><14.4><17.28><20.74><24.88>cmbtt10}{}
+\DeclareFontShape{OT1}{cmtex}{bx}{n}
+  {<-> ssub * cmtt/bx/n}{}
+\newcommand{\tex}[1]{\text{\texfamily#1}}	% NEU
+
+\newcommand{\Sp}{\hskip.33334em\relax}
+\newcommand{\NB}{\textbf{NB}}
+\newcommand{\Todo}[1]{$\langle$\textbf{To do:}~#1$\rangle$}
+
+\makeatother
+
+%\usepackage{haskell}
+
+\usepackage{proof}
+\usepackage{fullpage}
+
+\bibliographystyle{plain}
+
+\parskip=\medskipamount
+\parindent=0pt
+
+\newcommand{\isa}{\ensuremath{\; {:}{:}{=} \;}}
+\newcommand{\ora}{\ensuremath{\;\mid\;}}
+\newcommand{\IF}{\ensuremath{\mathtt{ if \;}}}
+\newcommand{\THEN}{\ensuremath{\mathtt{\; then \;}}}
+\newcommand{\ELSE}{\ensuremath{\mathtt{\; else \;}}}
+\newcommand{\TRUE}{\ensuremath{\mathtt{ true \;}}}
+\newcommand{\FALSE}{\ensuremath{\mathtt{\; false \;}}}
+\newcommand{\BOOL}{\ensuremath{\mathtt{\; Bool \;}}}
+
+\title{Composable Subtyped Lambda Calculus Interpreter}
+\author{Perry Alexander \\
+  The University of Kansas EECS Department\\
+  \texttt{alex@ittc.ku.edu}}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+The objective of Project 3 is to write an interpreter for simply typed
+lambda calculus with subtyping and records ($\lambda_{<:}$)
+expressions as defined in \emph{Types and Programming
+Languages}~\cite{Pie02a}, Chapters 15 and 16.  In addition, you were
+to include booleans and the $\IF$ special form.
+\section{SubtypedLambdaMonad Module}
+
+\begin{tabbing}\texfamily
+~~{\bfseries module}~{\itshape SubtypedLambdaComp}~(~{\itshape Term}(..)~)\\
+\texfamily ~~~~~~{\bfseries where}
+\end{tabbing}
+
+The \text{\texfamily {\itshape SubtypedLambdaComp}} module provides the basic definitions for
+manipulating simply typed lambda calculus expressions with subtyping
+and records added using composable interpreters.  As indicated by the
+module name, a monad is used to implement the evaluation and type
+checking processes.  The data type representing terms and types is
+first defined, followed by the type checking function, subtyping
+function, and the evaluation function.
+
+\subsection{Data Types}
+
+An abstract type \text{\texfamily \Varid{T}}, is defined to represent the two possible
+types in $\lambda_{<:}$.  A constant represents the Boolean
+type while a pair of types represents the $\rightarrow$ type former
+application.
+
+%  data Retval a = 
+%      Value a | Error String
+%      deriving (Eq,Show)
+%	       
+%  instance Monad Retval where
+%      Error s >>= k = Error s
+%      Value a >>= k = k a 
+%      return = Value
+%      fail = Error
+
+\begin{tabbing}\texfamily
+~~{\bfseries import}~{\itshape {\itshape Control}.{\itshape Monad}.Error}\\
+\texfamily ~~{\bfseries import}~{\itshape {\itshape Data}.List}\\
+\texfamily \\
+\texfamily ~~{\bfseries type}~{\itshape Retval}~a~=~{\itshape ErrorT}~{\itshape String}~{\itshape IO}~a\\
+\texfamily \\
+\texfamily ~~{\bfseries data}~\Varid{T}~=\\
+\texfamily ~~~~~~{\itshape TyBool}~|\\
+\texfamily ~~~~~~{\itshape TyTop}~|\\
+\texfamily ~~~~~~{\itshape TyArr}~\Varid{T}~\Varid{T}~|\\
+\texfamily ~~~~~~{\itshape TyTpl}~[\Varid{T}]~|\\
+\texfamily ~~~~~~{\itshape TyRec}~[({\itshape String},\Varid{T})]\\
+\texfamily ~~~~~~{\bfseries deriving}~({\itshape Eq},{\itshape Show})\\
+\texfamily \\
+\texfamily ~~dom~::~\Varid{T}~\char'31~{\itshape Retval}~\Varid{T}\\
+\texfamily ~~dom~t~=\\
+\texfamily ~~~~~~{\bfseries case}~t~{\bfseries of}\\
+\texfamily ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~{\itshape TyArr}~d~\char95 ~\char'31~return~d\\
+\texfamily ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~{\itshape TyBool}~\char'31~fail~\char34 Type~Error~-~Cannot~find~domain~of~a~boolean~type\char34 \\
+\texfamily ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~{\itshape TyRec}~\char95 ~\char'31~fail~\char34 Type~Error~-~Cannot~find~domain~of~a~record~type~\char34 \\
+\texfamily ~~~~~~~~~~~~~{\itshape TyTpl}~\char95 ~\char'31~fail~\char34 Type~Error~-~Cannot~find~the~domain~of~a~tuple~tye\char34 \\
+\texfamily ~~~~~~~~~~~~~{\itshape TyTop}~\char'31~fail~\char34 Type~Error~-~Cannot~find~the~domain~of~top\char34 \\
+\texfamily \\
+\texfamily ~~ran~::~\Varid{T}~\char'31~{\itshape Retval}~\Varid{T}\\
+\texfamily ~~ran~t~=\\
+\texfamily ~~~~~~{\bfseries case}~t~{\bfseries of}\\
+\texfamily ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~{\itshape TyArr}~\char95 ~r~\char'31~return~r\\
+\texfamily ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~{\itshape TyBool}~\char'31~fail~\char34 Type~Error~-~Cannot~find~range~of~a~boolean~type\char34 \\
+\texfamily ~~~~~~~~~~~~~{\itshape TyRec}~\char95 ~\char'31~fail~\char34 Type~Error~-~Cannot~find~range~of~a~record~type\char34 \\
+\texfamily ~~~~~~~~~~~~~{\itshape TyTpl}~\char95 ~\char'31~fail~\char34 Type~Error~-~Cannot~find~the~range~of~a~tuple~tye\char34 \\
+\texfamily ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~{\itshape TyTop}~\char'31~fail~\char34 Type~Error~-~Cannot~find~range~of~top\char34 \\
+\texfamily \\
+\texfamily ~~isArr~::~\Varid{T}~\char'31~{\itshape Bool}\\
+\texfamily ~~isArr~({\itshape TyArr}~\char95 ~\char95 )~=~{\itshape True}\\
+\texfamily ~~isArr~\char95 ~=~{\itshape False}\\
+\texfamily \\
+\texfamily ~~isRec~::~\Varid{T}~\char'31~{\itshape Bool}\\
+\texfamily ~~isRec~({\itshape TyRec}~\char95 )~=~{\itshape True}\\
+\texfamily ~~isRec~\char95 ~=~{\itshape False}\\
+\texfamily \\
+\texfamily ~~isTpl~::~\Varid{T}~\char'31~{\itshape Bool}\\
+\texfamily ~~isTpl~({\itshape TyTpl}~\char95 )~=~{\itshape True}\\
+\texfamily ~~isTpl~\char95 ~=~{\itshape False}
+\end{tabbing}
+
+A constructed type, \text{\texfamily {\itshape Term}}, is defined to represent the abstract
+syntax for $\lambda_{<:}$ terms.  Note that this definition is
+identical to that used in $\lambda_{<:}$ except \text{\texfamily {\itshape Lambda}}
+includes a type annotation, the \text{\texfamily {\itshape If}} construct is defined, and boolean
+costants have been added.  The implementation of the \text{\texfamily {\itshape Term}} type is a
+Maybe type that either represents a legal term or a form that cannot
+be evaluated.
+

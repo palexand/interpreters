@@ -1,0 +1,116 @@
+\documentclass[9pt]{book}
+\usepackage{verbatim}
+\usepackage{makeidx}
+\usepackage{fancyhdr}
+\usepackage{semantic}
+\usepackage{shortvrb}
+
+\pagestyle{fancy}
+
+
+\renewcommand{\chaptermark}[1]{ %
+ 	\markboth{\chaptername \ \thechapter. #1}{}}
+\renewcommand{\sectionmark}[1]{\markright{\thesection\ #1}}
+
+\newcommand{\helv}{ %
+	\fontfamily{phv}\fontseries{b}\fontsize{9}{11}\selectfont}
+
+\fancyhf{}
+\fancyfoot[C]{\helv \slshape \thepage}
+\fancyhead[LE,RO]{\helv \rightmark}
+\fancyhead[LO,RE]{\helv \leftmark}
+
+\makeindex
+
+\begin{document}
+
+ \input{Commands.tex}
+ \title{\bf Language Prototyping System
+       }
+ \author{Jose Emilio |Labra| Gayo}
+ \maketitle
+
+ \tableofcontents
+
+ \input{Introduction.tex}
+
+ \chapter{Recursive datatypes}
+ \input{Fix.lhs}
+ \input{MFix.lhs}
+ \input{SubType.lhs}
+ \input{SFunctor.lhs}
+
+ \chapter{Semantic Monads}
+ \input{ErrMonad.lhs}
+ \input{EnvMonad.lhs}
+ \input{StateMonad.lhs}
+ \input{ContMonad.lhs}
+ \input{IOMonad.lhs}
+ \input{SemMonad.lhs}
+ \input{DebugMonad.lhs}
+ 
+ \chapter{Monad Transformers}
+ \input{MonadT.lhs}
+ \input{Id.lhs}
+ \input{ErrorT.lhs}
+ \input{EnvT.lhs}
+ \input{StateT.lhs}
+ \input{DebugT.lhs}
+ \input{IOT.lhs}
+ \input{MonadTs.lhs}
+
+ \chapter{Common type classes}
+ \input{Initial.lhs}
+ \input{HasName.lhs}
+ \input{HasParser.lhs}
+ \input{ShowMonad.lhs}
+
+ 
+ \chapter{Interpreter Framework}
+ This chapter contains the modules used to build an interpreter
+ framework.
+
+ \input{Interp.lhs}
+ \input{Lang.lhs}
+ \input{Main.lhs}
+ \input{Shell.lhs}
+
+\chapter[A Functional Language]
+	{A functional Language}
+This chapter contains an interpreter of a simple functional 
+programming language with imperative features.
+
+\input{LLang.lhs}
+\input{Lambda.lhs}
+\input{LPretty.lhs}
+\input{LParser.lhs}
+
+\chapter{An imperative Language}
+\input{WLang.lhs}
+\input{While.lhs}
+\input{WParser.lhs}
+\input{WPretty.lhs}
+
+\chapter{A Simple Intermediate Language}
+\input{ILProgram.lhs}
+\input{ILContext.lhs}
+
+ \chapter{Miscellaneous Tools}
+ \input{Error.lhs}
+ \input{Heap.lhs}
+ \input{Memory.lhs}
+ \input{Table.lhs}
+ \input{Basics.lhs}
+ \input{Errors.lhs}
+ \input{ParserUtils.lhs}
+ \input{ShowUtils.lhs}
+ \input{IOUtils.lhs} 
+
+\input{Acknow.tex}
+
+\bibliography{LPS}
+\bibliographystyle{alpha}
+
+\printindex
+
+\end{document}

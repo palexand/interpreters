@@ -1,0 +1,74 @@
+
+# Standard defs:
+OBJS = $(SRCS:.hs=.o)
+GHC  = ghc
+CC   = gcc
+RM   = rm -f
+
+BASICFLAGS = -fglasgow-exts \
+	     -fallow-overlapping-instances \
+	     -fallow-undecidable-instances
+
+WARNINGS = 
+
+PACKAGES = -package lang -package text
+
+DEPENDFLAGS = $(PACKAGES)
+
+FLAGS = $(BASICFLAGS)
+FLAGS += $(WARNINGS)
+FLAGS += $(PACKAGES)
+
+# Specific
+
+SRCS =	Basics.lhs Errors.lhs \
+	Id.lhs Initial.lhs Runable.lhs \
+        DebugMonad.lhs ShowMonad.lhs ErrMonad.lhs StateMonad.lhs \
+	EnvMonad.lhs IOMonad.lhs ContMonad.lhs \
+	MonadTs.lhs MonadT.lhs ErrorT.lhs EnvT.lhs StateT.lhs \
+	DebugT.lhs IOT.lhs ContT.lhs \
+	Fix.lhs MFix.lhs SubType.lhs SFunctor.lhs SemMonad.lhs \
+	Shell.lhs Interp.lhs Lang.lhs Main.lhs \
+	Error.lhs HasName.lhs HasParser.lhs \
+	Heap.lhs Memory.lhs Table.lhs HashTable.lhs Stack.lhs \
+	ParserUtils.lhs ShowUtils.lhs IOUtils.lhs \
+	Lambda.lhs LParser.lhs LPretty.lhs LLang.lhs \
+	While.lhs WParser.lhs WPretty.lhs WLang.lhs \
+        ILProgram.lhs ILContext.lhs \
+
+OBJS = 	Basics.o Errors.o \
+	Id.o Initial.o Runable.o \
+	DebugMonad.o ShowMonad.o ErrMonad.o StateMonad.o \
+	EnvMonad.o IOMonad.o ContMonad.o \
+	MonadTs.o MonadT.o ErrorT.o EnvT.o StateT.o \
+	DebugT.o IOT.o ContT.o \
+	Fix.o MFix.o SubType.o SFunctor.o SemMonad.o \
+	Shell.o Interp.o Lang.o Main.o \
+	Error.o HasName.o HasParser.o \
+	Heap.o Memory.o Table.o HashTable.o Stack.o \
+	ParserUtils.o ShowUtils.o IOUtils.o \
+        Lambda.o LParser.o LPretty.o LLang.o \
+	While.o WParser.o WPretty.o WLang.o \
+        ILProgram.o ILContext.o
+
+lps : $(OBJS)
+	$(RM) $@
+	$(GHC) -o $@ $(FLAGS) $(OBJS)
+
+### Boilerplate GHC stuff
+
+.SUFFIXES	: .lhs .hs .hi .o
+
+depend :: 	$(SRC)
+		$(GHC) -M $(DEPENDFLAGS) $(SRCS)
+
+clean ::
+	$(RM) *.o *.hi *.exe *~
+
+%.hi		: %.o
+		@:
+
+%.o		: %.lhs
+		$(RM) $@
+		$(GHC) $(FLAGS) -c $< 
+

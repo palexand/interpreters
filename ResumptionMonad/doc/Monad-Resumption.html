@@ -1,0 +1,1034 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<!--Rendered using the Haskell Html Library v0.2-->
+<HTML
+><HEAD
+><META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8"
+><TITLE
+>Monad.Resumption</TITLE
+><LINK HREF="haddock.css" REL="stylesheet" TYPE="text/css"
+><SCRIPT SRC="haddock.js" TYPE="text/javascript"
+></SCRIPT
+></HEAD
+><BODY
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="topbar"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD
+><IMG SRC="haskell_icon.gif" WIDTH="16" HEIGHT="16" ALT=" "
+></TD
+><TD CLASS="title"
+></TD
+><TD CLASS="topbut"
+><A HREF="index.html"
+>Contents</A
+></TD
+><TD CLASS="topbut"
+><A HREF="doc-index.html"
+>Index</A
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="modulebar"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD
+><FONT SIZE="6"
+>Monad.Resumption</FONT
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="section4"
+><B
+>Contents</B
+></TD
+></TR
+><TR
+><TD
+><DL
+><DT
+><A HREF="#1"
+>Basic resumption monad transformer defining pause and done
+</A
+></DT
+><DT
+><A HREF="#2"
+>Reactive resumption monad transformer defining query and response
+</A
+></DT
+><DT
+><A HREF="#3"
+>Observation monad transformer defining observation points
+</A
+></DT
+></DL
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section1"
+>Synopsis</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+> <A HREF="#t%3AResT"
+>ResT</A
+> m a</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+>= <A HREF="#v%3ADone"
+>Done</A
+> a</TD
+></TR
+><TR
+><TD CLASS="decl"
+>| <A HREF="#v%3APause"
+>Pause</A
+> (m (<A HREF="Monad-Resumption.html#t%3AResT"
+>ResT</A
+> m a))</TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>class</SPAN
+> <A HREF="#t%3AMonadResume"
+>MonadResume</A
+> m n  <SPAN CLASS="keyword"
+>where</SPAN
+></TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Astep"
+>step</A
+> :: n a -&gt; m n a</TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3ArunResT"
+>runResT</A
+> :: Monad m =&gt; <A HREF="Monad-Resumption.html#t%3AResT"
+>ResT</A
+> m a -&gt; m a</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+> <A HREF="#t%3AReactT"
+>ReactT</A
+> req rsp m a</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+>= <A HREF="#v%3AD"
+>D</A
+> a</TD
+></TR
+><TR
+><TD CLASS="decl"
+>| <A HREF="#v%3AP"
+>P</A
+> req (rsp -&gt; m (<A HREF="Monad-Resumption.html#t%3AReactT"
+>ReactT</A
+> req rsp m a))</TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>class</SPAN
+> <A HREF="#t%3ASignal"
+>Signal</A
+> a  <SPAN CLASS="keyword"
+>where</SPAN
+></TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Aack"
+>ack</A
+> :: a</TD
+></TR
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Acont"
+>cont</A
+> :: a</TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>class</SPAN
+> <A HREF="#t%3AMonadReact"
+>MonadReact</A
+> m req rsp | m -&gt; rsp, m -&gt; req <SPAN CLASS="keyword"
+>where</SPAN
+></TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Asignal"
+>signal</A
+> :: req -&gt; m rsp</TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+> <A HREF="#t%3AObsT"
+>ObsT</A
+> obs m a</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+>= <A HREF="#v%3ADn"
+>Dn</A
+> a</TD
+></TR
+><TR
+><TD CLASS="decl"
+>| <A HREF="#v%3APs"
+>Ps</A
+> obs (m (<A HREF="Monad-Resumption.html#t%3AObsT"
+>ObsT</A
+> obs m a))</TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>class</SPAN
+> <A HREF="#t%3AMonadObserve"
+>MonadObserve</A
+> obs m | m -&gt; obs <SPAN CLASS="keyword"
+>where</SPAN
+></TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Aobserve"
+>observe</A
+> :: obs -&gt; m ()</TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section1"
+><A NAME="1"
+>Basic resumption monad transformer defining pause and done
+</A
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+> <A NAME="t%3AResT"
+></A
+><B
+>ResT</B
+> m a</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>Define ResT for representing resumption monads
+</TD
+></TR
+><TR
+><TD CLASS="section4"
+>Constructors</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v%3ADone"
+></A
+><B
+>Done</B
+> a</TD
+><TD CLASS="rdoc"
+>A completed process results in a value.
+</TD
+></TR
+><TR
+><TD CLASS="arg"
+><A NAME="v%3APause"
+></A
+><B
+>Pause</B
+> (m (<A HREF="Monad-Resumption.html#t%3AResT"
+>ResT</A
+> m a))</TD
+><TD CLASS="rdoc"
+>A paused process will behave like the resumption that is its argument.
+</TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="section4"
+><IMG SRC="minus.gif" CLASS="coll" ONCLICK="toggle(this,'i:ResT')" ALT="show/hide"
+> Instances</TD
+></TR
+><TR
+><TD CLASS="body"
+><DIV ID="i:ResT" STYLE="display:block;"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+>MonadTrans <A HREF="Monad-Resumption.html#t%3AResT"
+>ResT</A
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+>Monad n =&gt; <A HREF="Monad-Resumption.html#t%3AMonadResume"
+>MonadResume</A
+> <A HREF="Monad-Resumption.html#t%3AResT"
+>ResT</A
+> n</TD
+></TR
+><TR
+><TD CLASS="decl"
+>MonadError e m =&gt; MonadError e (<A HREF="Monad-Resumption.html#t%3AResT"
+>ResT</A
+> m)</TD
+></TR
+><TR
+><TD CLASS="decl"
+>MonadReader e m =&gt; MonadReader e (<A HREF="Monad-Resumption.html#t%3AResT"
+>ResT</A
+> m)</TD
+></TR
+><TR
+><TD CLASS="decl"
+>MonadState s m =&gt; MonadState s (<A HREF="Monad-Resumption.html#t%3AResT"
+>ResT</A
+> m)</TD
+></TR
+><TR
+><TD CLASS="decl"
+>MonadWriter w m =&gt; MonadWriter w (<A HREF="Monad-Resumption.html#t%3AResT"
+>ResT</A
+> m)</TD
+></TR
+><TR
+><TD CLASS="decl"
+>Monad m =&gt; Monad (<A HREF="Monad-Resumption.html#t%3AResT"
+>ResT</A
+> m)</TD
+></TR
+><TR
+><TD CLASS="decl"
+>MonadPlus m =&gt; MonadPlus (<A HREF="Monad-Resumption.html#t%3AResT"
+>ResT</A
+> m)</TD
+></TR
+></TABLE
+></DIV
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>class</SPAN
+> <A NAME="t%3AMonadResume"
+></A
+><B
+>MonadResume</B
+> m n  <SPAN CLASS="keyword"
+>where</SPAN
+></TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>Methods specific to resumption monads
+</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="section4"
+>Methods</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><A NAME="v%3Astep"
+></A
+><B
+>step</B
+> :: n a -&gt; m n a</TD
+></TR
+><TR
+><TD CLASS="doc"
+>Step is essentially a lift function.
+</TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="section4"
+><IMG SRC="minus.gif" CLASS="coll" ONCLICK="toggle(this,'i:MonadResume')" ALT="show/hide"
+> Instances</TD
+></TR
+><TR
+><TD CLASS="body"
+><DIV ID="i:MonadResume" STYLE="display:block;"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+>Monad n =&gt; <A HREF="Monad-Resumption.html#t%3AMonadResume"
+>MonadResume</A
+> <A HREF="Monad-Resumption.html#t%3AResT"
+>ResT</A
+> n</TD
+></TR
+><TR
+><TD CLASS="decl"
+>(Monad m, <A HREF="Monad-Resumption.html#t%3ASignal"
+>Signal</A
+> a) =&gt; <A HREF="Monad-Resumption.html#t%3AMonadResume"
+>MonadResume</A
+> (<A HREF="Monad-Resumption.html#t%3AReactT"
+>ReactT</A
+> a a) m</TD
+></TR
+></TABLE
+></DIV
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v%3ArunResT"
+></A
+><B
+>runResT</B
+> :: Monad m =&gt; <A HREF="Monad-Resumption.html#t%3AResT"
+>ResT</A
+> m a -&gt; m a</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section1"
+><A NAME="2"
+>Reactive resumption monad transformer defining query and response
+</A
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+> <A NAME="t%3AReactT"
+></A
+><B
+>ReactT</B
+> req rsp m a</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>Define ReactT for representing reactive resumption monads.  req represents
+ a request being sent to an external data source.  rsp is the response to the
+ request and processed by a function that generates a monad representing
+ the reactive resumption monad's processing of the response.  Note that the
+ result of processing a response is another ReactT structure that could
+ request more data or represent a completed computation.
+</TD
+></TR
+><TR
+><TD CLASS="section4"
+>Constructors</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v%3AD"
+></A
+><B
+>D</B
+> a</TD
+><TD CLASS="rdoc"
+>A completed process resulting in a value of type a
+</TD
+></TR
+><TR
+><TD CLASS="arg"
+><A NAME="v%3AP"
+></A
+><B
+>P</B
+> req (rsp -&gt; m (<A HREF="Monad-Resumption.html#t%3AReactT"
+>ReactT</A
+> req rsp m a))</TD
+><TD CLASS="rdoc"
+>A paused process sending query req and responding to query
+ results by applying the response function.  req represents the
+ query.  The function from rsp to a new monad represents the
+ processing of the response.  The resulting monad encapsulates
+ a ReactT that could result in a Paused or Completed process.
+</TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="section4"
+><IMG SRC="minus.gif" CLASS="coll" ONCLICK="toggle(this,'i:ReactT')" ALT="show/hide"
+> Instances</TD
+></TR
+><TR
+><TD CLASS="body"
+><DIV ID="i:ReactT" STYLE="display:block;"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+>(Monad m, <A HREF="Monad-Resumption.html#t%3ASignal"
+>Signal</A
+> a) =&gt; <A HREF="Monad-Resumption.html#t%3AMonadResume"
+>MonadResume</A
+> (<A HREF="Monad-Resumption.html#t%3AReactT"
+>ReactT</A
+> a a) m</TD
+></TR
+><TR
+><TD CLASS="decl"
+>Monad m =&gt; Monad (<A HREF="Monad-Resumption.html#t%3AReactT"
+>ReactT</A
+> req resp m)</TD
+></TR
+><TR
+><TD CLASS="decl"
+>Monad m =&gt; <A HREF="Monad-Resumption.html#t%3AMonadReact"
+>MonadReact</A
+> (<A HREF="Monad-Resumption.html#t%3AReactT"
+>ReactT</A
+> req rsp m) req rsp</TD
+></TR
+></TABLE
+></DIV
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>class</SPAN
+> <A NAME="t%3ASignal"
+></A
+><B
+>Signal</B
+> a  <SPAN CLASS="keyword"
+>where</SPAN
+></TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>Define a Signal class
+</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="section4"
+>Methods</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><A NAME="v%3Aack"
+></A
+><B
+>ack</B
+> :: a</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v%3Acont"
+></A
+><B
+>cont</B
+> :: a</TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="section4"
+><IMG SRC="minus.gif" CLASS="coll" ONCLICK="toggle(this,'i:Signal')" ALT="show/hide"
+> Instances</TD
+></TR
+><TR
+><TD CLASS="body"
+><DIV ID="i:Signal" STYLE="display:block;"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><A HREF="Monad-Resumption.html#t%3ASignal"
+>Signal</A
+> Int</TD
+></TR
+></TABLE
+></DIV
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>class</SPAN
+> <A NAME="t%3AMonadReact"
+></A
+><B
+>MonadReact</B
+> m req rsp | m -&gt; rsp, m -&gt; req <SPAN CLASS="keyword"
+>where</SPAN
+></TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>Methods specific to reactive resumption monads
+</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="section4"
+>Methods</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><A NAME="v%3Asignal"
+></A
+><B
+>signal</B
+> :: req -&gt; m rsp</TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="section4"
+><IMG SRC="minus.gif" CLASS="coll" ONCLICK="toggle(this,'i:MonadReact')" ALT="show/hide"
+> Instances</TD
+></TR
+><TR
+><TD CLASS="body"
+><DIV ID="i:MonadReact" STYLE="display:block;"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+>Monad m =&gt; <A HREF="Monad-Resumption.html#t%3AMonadReact"
+>MonadReact</A
+> (<A HREF="Monad-Resumption.html#t%3AReactT"
+>ReactT</A
+> req rsp m) req rsp</TD
+></TR
+></TABLE
+></DIV
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section1"
+><A NAME="3"
+>Observation monad transformer defining observation points
+</A
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+> <A NAME="t%3AObsT"
+></A
+><B
+>ObsT</B
+> obs m a</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>Define ObsT to represent snapshot resumption monads
+</TD
+></TR
+><TR
+><TD CLASS="section4"
+>Constructors</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v%3ADn"
+></A
+><B
+>Dn</B
+> a</TD
+><TD CLASS="rdoc"
+></TD
+></TR
+><TR
+><TD CLASS="arg"
+><A NAME="v%3APs"
+></A
+><B
+>Ps</B
+> obs (m (<A HREF="Monad-Resumption.html#t%3AObsT"
+>ObsT</A
+> obs m a))</TD
+><TD CLASS="rdoc"
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="section4"
+><IMG SRC="minus.gif" CLASS="coll" ONCLICK="toggle(this,'i:ObsT')" ALT="show/hide"
+> Instances</TD
+></TR
+><TR
+><TD CLASS="body"
+><DIV ID="i:ObsT" STYLE="display:block;"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+>Monad m =&gt; <A HREF="Monad-Resumption.html#t%3AMonadObserve"
+>MonadObserve</A
+> o (<A HREF="Monad-Resumption.html#t%3AObsT"
+>ObsT</A
+> o m)</TD
+></TR
+><TR
+><TD CLASS="decl"
+>Monad m =&gt; Monad (<A HREF="Monad-Resumption.html#t%3AObsT"
+>ObsT</A
+> o m)</TD
+></TR
+></TABLE
+></DIV
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>class</SPAN
+> <A NAME="t%3AMonadObserve"
+></A
+><B
+>MonadObserve</B
+> obs m | m -&gt; obs <SPAN CLASS="keyword"
+>where</SPAN
+></TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>Define methods specific to snapshot resumption monads
+</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="section4"
+>Methods</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><A NAME="v%3Aobserve"
+></A
+><B
+>observe</B
+> :: obs -&gt; m ()</TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="section4"
+><IMG SRC="minus.gif" CLASS="coll" ONCLICK="toggle(this,'i:MonadObserve')" ALT="show/hide"
+> Instances</TD
+></TR
+><TR
+><TD CLASS="body"
+><DIV ID="i:MonadObserve" STYLE="display:block;"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+>Monad m =&gt; <A HREF="Monad-Resumption.html#t%3AMonadObserve"
+>MonadObserve</A
+> o (<A HREF="Monad-Resumption.html#t%3AObsT"
+>ObsT</A
+> o m)</TD
+></TR
+></TABLE
+></DIV
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="botbar"
+>Produced by <A HREF="http://www.haskell.org/haddock/"
+>Haddock</A
+> version 0.7</TD
+></TR
+></TABLE
+></BODY
+></HTML
+>

@@ -1,0 +1,19 @@
+This directory contains semantic definitions for languages built using
+the modular monadic semantics libraries. The definitions follow
+Benjamin Pierce's  _Types and Programming Languages_ book, with the
+corresponding subdirectories:
+
+ULC -> Chapter 5 "The Untyped Lambda Calculus"
+Notes: 
+The interpreter is next to useless to use, since transformations in this language are fundamentally syntactic. Because we represent values for lambda terms in the object language as functions in the meta language, printing out the result of an evaluation is difficult because (Haskell) function values are opaque.
+
+For learning the lambda calculus, it would be more worthwhile to implement this interpreter as a source-to-source transformation. I didn't do this initially because the given semantics are useful when implementing later interpreters. The primary problem with the source-to-source approach is that it becomes necessary to define instances of Show for terms; this is a difficult task, and can't be derived since it has a recursive class constraint on the show implementation of Fix.
+
+Also, this section introduces some monad cruft which will be necessary later. Unfortunately, GHC can't automatically derive Monad* instances for recursive newtypes, and we need a newtype since the monad is recursive (in the environment type).
+
+DeBruijn -> Chapter 6 "Nameless Representation of Terms"
+Notes: Not started yet. Plan a Named -> Nameless source-to-source (hereafter s2s) transformation, as well as an example "stack machine" evaluator to show the connection between deBruijn representation and stack offsets.
+
+TAE -> Chaper 8 "Typed Aritemetic Expressions"
+Notes: TODO
+

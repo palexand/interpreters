@@ -1,0 +1,979 @@
+\documentclass[10pt]{article}
+
+%% ODER: format ==         = "\mathrel{==}"
+%% ODER: format /=         = "\neq "
+\makeatletter
+
+\usepackage{amstext}
+\usepackage{amssymb}
+\usepackage{stmaryrd}
+\DeclareFontFamily{OT1}{cmtex}{}
+\DeclareFontShape{OT1}{cmtex}{m}{n}
+  {<5><6><7><8>cmtex8
+   <9>cmtex9
+   <10><10.95><12><14.4><17.28><20.74><24.88>cmtex10}{}
+\DeclareFontShape{OT1}{cmtex}{m}{it}
+  {<-> ssub * cmtt/m/it}{}
+\newcommand{\texfamily}{\fontfamily{cmtex}\selectfont}
+\DeclareFontShape{OT1}{cmtt}{bx}{n}
+  {<5><6><7><8>cmtt8
+   <9>cmbtt9
+   <10><10.95><12><14.4><17.28><20.74><24.88>cmbtt10}{}
+\DeclareFontShape{OT1}{cmtex}{bx}{n}
+  {<-> ssub * cmtt/bx/n}{}
+\newcommand{\tex}[1]{\text{\texfamily#1}}	% NEU
+
+\newcommand{\Sp}{\hskip.33334em\relax}
+
+\newlength{\lwidth}\setlength{\lwidth}{4.5cm}
+\newlength{\cwidth}\setlength{\cwidth}{8mm} % 3mm
+
+\newcommand{\Conid}[1]{\mathit{#1}}
+\newcommand{\Varid}[1]{\mathit{#1}}
+\newcommand{\anonymous}{\kern0.06em \vbox{\hrule\@width.5em}}
+\newcommand{\plus}{\mathbin{+\!\!\!+}}
+\newcommand{\bind}{\mathbin{>\!\!\!>\mkern-6.7mu=}}
+\newcommand{\sequ}{\mathbin{>\!\!\!>}}
+\renewcommand{\leq}{\leqslant}
+\renewcommand{\geq}{\geqslant}
+\newcommand{\NB}{\textbf{NB}}
+\newcommand{\Todo}[1]{$\langle$\textbf{To do:}~#1$\rangle$}
+
+\makeatother
+
+\usepackage{fullpage}
+\usepackage{alltt}
+
+\bibliographystyle{plain}
+
+\parskip=\medskipamount
+\parindent=0pt
+
+\title{A Haskell Companion for ``Using catamorphisms, subtypes and
+  monad transformers for writing modular functional interpreters''}
+\author{\emph{Uk'taad B'mal} \\
+  The University of Kansas - ITTC \\
+  2335 Irving Hill Rd, Lawrence, KS 66045 \\
+  \texttt{lambda@ittc.ku.edu}}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+
+  This document is a primer to accompany the paper ``Using
+  catamorphisms, subtypes, and monad transformers for writing modular
+  functional interpreters'' by Luc Duponcheel.  It attempts to
+  re-implement in \texttt{Haskell} the interpreters written in
+  \texttt{Gopher}.  In addition to the interpreters, examples
+  expressions are provided for each interpreter to help readers
+  understand the abstract syntax interpreted.  Each interpreter is
+  also extended to demonstrate how well the modular interpreter
+  achieves its modularity goal.
+\end{abstract}
+
+\section{Introduction}
+
+Among them most accessible papers on composable interpreters is
+Duponcheel's ``Using catamorphisms, subtypes and monad transformers
+for writing modular functional interpreters.''  Unfortunately, the
+code examples are written in \texttt{Gopher} rather than
+\texttt{Haskell} and there are no examples of actual expressions or
+expression evaluation.  This document attempts to address this problem
+by providing \texttt{Haskell} source in literal script as well as
+example expressions for the several interpreters.  Three different
+interpreters are defined based on Duponcheel's examples.  In addition,
+examples of extension are included for the two modular interpreters.
+
+\section{First Try}
+
+Module \ensuremath{\Conid{FirstTry}} presents a Haskell encoding of Duponcheel's First
+Try at building a modular interpreter:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{module}\;\Conid{FirstTry}\;\mathbf{where}}$
+\end{tabbing}
+The interpreter defined is a simple implementation of a language that
+supports adding and dividing integer numbers.  The approach is to
+first define an interpreter for numbers and addition (\ensuremath{\Varid{eval}_1}), then
+extend the interpreter to include division (\ensuremath{\Varid{eval}_2}).
+
+First, we define data structures for \ensuremath{\Varid{Expr}_1} representing numbers and
+addition:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Varid{Expr}_1}$\\
+${\hskip2.00em\relax\mathrel{=}\Conid{Num1}\;\Conid{Int}}$\\
+${\hskip2.00em\relax\mid \Conid{Add1}\;\Varid{Expr}_1\;\Varid{Expr}_1}$\\
+${\hskip2.00em\relax\phantom{\mid \mbox{}}\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$
+\end{tabbing}
+Next, define semantic functions associated with the two operations.
+\ensuremath{\Varid{num}} simply returns the number encapsulated buy \ensuremath{\Conid{Num}} while \ensuremath{\Varid{add}}
+sums the numbers associated with an \ensuremath{\Conid{Add}} term.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{num}\mathrel{=}\Varid{id}\mbox{\qquad-{}-  Num1 Int}}$\\
+${\Varid{add}\;\Varid{x}\;\Varid{y}\mathrel{=}\Varid{x}\mathbin{+}\Varid{y}\mbox{\qquad-{}-  Add1 Expr1 Expr1}}$
+\end{tabbing}
+The \ensuremath{\Varid{eval}_1} function associates semantics with abstract syntax.  For
+each term defined in \ensuremath{\Varid{Expr}_1}, \ensuremath{\Varid{eval}_1} generates a semantic
+interpretation:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{eval}_1\mathbin{::}\Varid{Expr}_1\to \Conid{Int}}$\\
+${\Varid{eval}_1\;(\Conid{Num1}\;\Varid{x})\mathrel{=}\Varid{num}\;\Varid{x}\mbox{\qquad-{}-  Num1 x}}$\\
+${\Varid{eval}_1\;(\Conid{Add1}\;\Varid{x}\;\Varid{y})\mathrel{=}\Varid{eval}_1\;\Varid{x}\mathbin{`\Varid{add}`}\Varid{eval}_1\;\Varid{y}\mbox{\qquad-{}-  Add1 x y}}$
+\end{tabbing}
+We now have an interpreter defined for numbers and addition operations
+where both are defined as constructors in a single data type.  What we
+are attempting to demonstrate is that such interpreters can be
+extended by adding further operations and types.  In this case, we'll
+add a division operation to the initial interpreter.
+
+Because the initial interpreter is not particularly modular, the
+extension requires us to touch almost all of the original code.
+First, the \ensuremath{\Varid{Expr}_1} data type is modified to include a division
+operation and becomes \ensuremath{\Conid{Expr}}:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{Expr}}$\\
+${\hskip2.00em\relax\mathrel{=}\Conid{Num}\;\Conid{Int}}$\\
+${\hskip2.00em\relax\mid \Conid{Add}\;\Conid{Expr}\;\Conid{Expr}}$\\
+${\hskip2.00em\relax\mid \Conid{Dvd}\;\Conid{Expr}\;\Conid{Expr}}$\\
+${\hskip2.00em\relax\phantom{\mid \mbox{}}\mathbf{deriving}\;(\Conid{Show},\Conid{Eq})}$
+\end{tabbing}
+We can reuse the semantic definitions for \ensuremath{\Conid{Num}} and \ensuremath{\Conid{Add}}, but we need
+a semantic definition for \ensuremath{\Conid{Dvd}}:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{dvd}\;\Varid{x}\;\Varid{y}\mathrel{=}\mathbf{if}\;\Varid{y}\equiv \mathrm{0}\;\mathbf{then}\;\Varid{error}\;\text{\tt \char34 Divide~by~zero\char34}\;\mathbf{else}\;\Varid{x}\mathbin{\Varid{`div`}}\Varid{y}}$
+\end{tabbing}
+The new \ensuremath{\Varid{eval}} function extends \ensuremath{\Varid{eval}_1} by adding a case for the
+division operation.  Note that the function must be rewritten and
+cannot simply be extended.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{eval}\mathbin{::}\Conid{Expr}\to \Conid{Int}}$\\
+${\Varid{eval}\;(\Conid{Num}\;\Varid{x})\mathrel{=}\Varid{id}\;\Varid{x}}$\\
+${\Varid{eval}\;(\Conid{Add}\;\Varid{x}\;\Varid{y})\mathrel{=}\Varid{eval}\;\Varid{x}\mathbin{`\Varid{add}`}\Varid{eval}\;\Varid{y}}$\\
+${\Varid{eval}\;(\Conid{Dvd}\;\Varid{x}\;\Varid{y})\mathrel{=}\Varid{eval}\;\Varid{x}\mathbin{`\Varid{dvd}`}\Varid{eval}\;\Varid{y}}$
+\end{tabbing}
+With this, we have an interpreter for an expression language that
+allows numbers, addition and division.  Each new type or operation
+requires the same effort of rewriting expression syntax, adding
+semantics and modifying the evaluation function.  With the exception
+of the semantic functions, virtually none of the existing code goes
+unmodified.  For small interpreters, this is not a problem.  For
+larger, more complex interpreters extension becomes more difficult.
+
+\section{Second Try}
+
+Module \ensuremath{\Conid{SecondTry}} presents a Haskell encoding of Duponcheel's Second
+Try and building a modular interpreter:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{module}\;\Conid{SecondTry}\;\mathbf{where}}$
+\end{tabbing}
+Again, we define data structures for \ensuremath{\Varid{E}_1} representing the abstract
+syntax of numbers and addition, and \ensuremath{\Varid{E}_2} representing the abstract
+syntax of division.  Unlike First Try, these data structures are
+separate types::
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Varid{E}_1\;\Varid{x}}$\\
+${\hskip2.00em\relax\mathrel{=}\Conid{Num}\;\Conid{Int}}$\\
+${\hskip2.00em\relax\mid \Conid{Add}\;\Varid{x}\;\Varid{x}}$\\
+${\hskip2.00em\relax\phantom{\mid \mbox{}}\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$\\
+${}$\\
+${\mathbf{data}\;\Varid{E}_2\;\Varid{x}\mathrel{=}\Conid{Dvd}\;\Varid{x}\;\Varid{x}\;\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$
+\end{tabbing}
+The difficult with expressions as defined in First Try is their
+recursive nature.  Because of this, the single data structure
+representing expression must be modified each time the language is
+updated.  Here, we use \ensuremath{\Varid{E}_1} and \ensuremath{\Varid{E}_2} to define expressions that are not
+directly recursive.  The data constructors \ensuremath{\Conid{In1}} and \ensuremath{\Conid{In2}} prevent
+general recursion in the data types:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Varid{Expr}_1\mathrel{=}\Conid{In1}\;(\Varid{E}_1\;\Varid{Expr}_1)\;\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$\\
+${}$\\
+${\mathbf{data}\;\Varid{Expr}_2\mathrel{=}\Conid{In2}\;(\Varid{E}_2\;\Varid{Expr}_2)\;\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$
+\end{tabbing}
+Semantic functions for each of the operations remain unchanged and
+will remain unchanged in all our interpreters:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{num}\mathrel{=}\Varid{id}\mbox{\qquad-{}-  Num1 Int}}$\\
+${\Varid{add}\;\Varid{x}\;\Varid{y}\mathrel{=}\Varid{x}\mathbin{+}\Varid{y}\mbox{\qquad-{}-  Add1 Expr1 Expr1}}$\\
+${\Varid{dvd}\;\Varid{x}\;\Varid{y}\mathrel{=}\mathbf{if}\;\Varid{y}\equiv \mathrm{0}\;\mathbf{then}\;\Varid{error}\;\text{\tt \char34 Divide~by~zero\char34}\;\mathbf{else}\;\Varid{x}\mathbin{\Varid{`div`}}\Varid{y}}$
+\end{tabbing}
+%% Working here...
+
+Two helper functions are used to define evaluation functions for each
+of the data types.  A \ensuremath{\Varid{map}} function distributes a function across an
+expression.  Specifically, if \ensuremath{\Varid{g}} is a function, then mapping \ensuremath{\Varid{g}} onto
+\ensuremath{\Conid{Add}\;\Varid{x}\;\Varid{y}} is equal to \ensuremath{\Conid{Add}\;(\Varid{g}\;\Varid{x})\;(\Varid{g}\;\Varid{y})}.  The \ensuremath{\Varid{map}} function will be
+used to map \ensuremath{\Varid{eval}} functions onto language terms.  The \ensuremath{\Varid{\phi}} functions
+map syntax to semantics.  Each \ensuremath{\Varid{\phi}} function maps a term to its
+semantic interpretation.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{map1}\mathbin{::}(\Varid{x}\to \Varid{y})\to (\Varid{E}_1\;\Varid{x}\to \Varid{E}_1\;\Varid{y})}$\\
+${\Varid{map1}\;\Varid{g}\;(\Conid{Num}\;\Varid{n})\mathrel{=}\Conid{Num}\;\Varid{n}}$\\
+${\Varid{map1}\;\Varid{g}\;(\Conid{Add}\;\Varid{e}\;\Varid{f})\mathrel{=}(\Conid{Add}\;(\Varid{g}\;\Varid{e})\;(\Varid{g}\;\Varid{f}))}$\\
+${}$\\
+${\Varid{map2}\mathbin{::}(\Varid{x}\to \Varid{y})\to (\Varid{E}_2\;\Varid{x}\to \Varid{E}_2\;\Varid{y})}$\\
+${\Varid{map2}\;\Varid{g}\;(\Conid{Dvd}\;\Varid{e}\;\Varid{f})\mathrel{=}(\Conid{Dvd}\;(\Varid{g}\;\Varid{e})\;(\Varid{g}\;\Varid{f}))}$\\
+${}$\\
+${\Varid{\phi_1}\mathbin{::}\Varid{E}_1\;\Conid{Int}\to \Conid{Int}}$\\
+${\Varid{\phi_1}\;(\Conid{Num}\;\Varid{n})\mathrel{=}\Varid{num}\;\Varid{n}}$\\
+${\Varid{\phi_1}\;(\Conid{Add}\;\Varid{e}\;\Varid{f})\mathrel{=}\Varid{e}\mathbin{`\Varid{add}`}\Varid{f}}$\\
+${}$\\
+${\Varid{\phi_2}\mathbin{::}\Varid{E}_2\;\Conid{Int}\to \Conid{Int}}$\\
+${\Varid{\phi_2}\;(\Conid{Dvd}\;\Varid{e}\;\Varid{f})\mathrel{=}\Varid{e}\mathbin{`\Varid{dvd}`}\Varid{f}}$
+\end{tabbing}
+An evaluation function becomes mapping the evaluation function onto a
+term and semantically interpreting the result.  The functions \ensuremath{\Varid{eval}_1}
+and \ensuremath{\Varid{eval}_2} separately evaluate expressions \ensuremath{\Varid{Expr}_1} and \ensuremath{\Varid{Expr}_2} and
+are included as examples of writing evaluation functions. They will
+not be used to write the composite evaluation function for both terms.
+Instead, \ensuremath{\Varid{map}} and \ensuremath{\Varid{psi}} functions will be composed to form a new
+evaluation function.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{eval}_1\mathbin{::}\Varid{Expr}_1\to \Conid{Int}}$\\
+${\Varid{eval}_1\;(\Conid{In1}\;\Varid{e1})\mathrel{=}\Varid{\phi_1}\;(\Varid{map1}\;\Varid{eval}_1\;\Varid{e1})}$\\
+${}$\\
+${\Varid{eval}_2\mathbin{::}\Varid{Expr}_2\to \Conid{Int}}$\\
+${\Varid{eval}_2\;(\Conid{In2}\;\Varid{e2})\mathrel{=}\Varid{\phi_2}\;(\Varid{map2}\;\Varid{eval}_2\;\Varid{e2})}$
+\end{tabbing}
+The \ensuremath{\Conid{Sum}} data type is a general purpose data structure that defines
+the disjoint union of two other data types.  The union is disjoint
+because the constructors \ensuremath{\Conid{L}} and \ensuremath{\Conid{R}} identify the original type any
+element of the sum must come from.  (In a real implementation, the
+built-in \ensuremath{\Conid{Either}} type would be used rather than writing our own
+\ensuremath{\Conid{Sum}}.)
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{Sum}\;\Varid{x}\;\Varid{y}\mathrel{=}\Conid{L}\;\Varid{x}\mid \Conid{R}\;\Varid{y}\;\mathbf{deriving}\;(\Conid{Show},\Conid{Eq})}$\\
+${}$\\
+${(\mathbin{<+>})\mathbin{::}(\Varid{x}\to \Varid{z})\to (\Varid{y}\to \Varid{z})\to (\Conid{Sum}\;\Varid{x}\;\Varid{y}\to \Varid{z})}$\\
+${\Varid{l}\mathbin{<+>}\Varid{r}\mathrel{=}\lambda \Varid{s}\to \mathbf{case}\;\Varid{s}\;\mathbf{of}}$\\
+${\phantom{\Varid{l}\mathbin{<+>}\Varid{r}\mathrel{=}\lambda \Varid{s}\to \mathbf{case}\;\Varid{s}\;\mbox{}}\Conid{L}\;\Varid{x}\to \Varid{l}\;\Varid{x}}$\\
+${\phantom{\Varid{l}\mathbin{<+>}\Varid{r}\mathrel{=}\lambda \Varid{s}\to \mathbf{case}\;\Varid{s}\;\mbox{}}\Conid{R}\;\Varid{x}\to \Varid{r}\;\Varid{x}}$
+\end{tabbing}
+The type synonym, \ensuremath{\Conid{E}}, represents the sum of the abstract syntax data
+types for numbers and addition (\ensuremath{\Varid{E}_1}) and division (\ensuremath{\Varid{E}_2}).  The \ensuremath{\Conid{L}}
+constructor will encapsulate numbers and addition while the \ensuremath{\Conid{R}}
+constructor will encapsulate division.  The type \ensuremath{\Conid{E}} is the disjoint
+union and may thus be constructed with \ensuremath{\Conid{L}} or \ensuremath{\Conid{R}} and may therefore
+be either of the expression types.  Thus, we now have a type that
+encapsulates both terms.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{type}\;\Conid{E}\;\Varid{x}\mathrel{=}\Conid{Sum}\;(\Varid{E}_1\;\Varid{x})\;(\Varid{E}_2\;\Varid{x})}$
+\end{tabbing}
+The \ensuremath{\Conid{Expr}} data type represents an individual expression encapsulated
+by the \ensuremath{\Conid{InE}} constructor.  This is necessary to identify both \ensuremath{\Conid{L}} and
+\ensuremath{\Conid{R}} constructs from \ensuremath{\Conid{Sum}} as expressions.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{Expr}\mathrel{=}\Conid{InE}\;(\Conid{E}\;\Conid{Expr})}$
+\end{tabbing}
+With expressions defined, we can now define \ensuremath{\Varid{map}}, \ensuremath{\Varid{\phi}} and \ensuremath{\Varid{eval}}
+functions using the same technique as for individual terms.  The
+composite \ensuremath{\Varid{map}} function, \ensuremath{\Varid{map}_E}, uses \ensuremath{\Varid{map1}} and \ensuremath{\Varid{map2}} to define a
+composite map function.  The construction is fascinating and is worth
+some investigation.
+
+The signature of \ensuremath{\Conid{MapE}} indicates that we will take a function between
+two seemingly arbitrary types, \ensuremath{\Varid{x}} and \ensuremath{\Varid{y}}, and produces a function
+that maps the encapsulation of \ensuremath{\Varid{x}} as a term into the encapsulation
+of \ensuremath{\Varid{y}} as a term.  This implies that \ensuremath{\Varid{x}} and \ensuremath{\Varid{y}} are not arbitrary at
+all.  Because \ensuremath{\Conid{E}} is defined as the \ensuremath{\Conid{Sum}} of \ensuremath{\Varid{E}_1} and \ensuremath{\Varid{E}_2}, we know
+that \ensuremath{\Varid{x}} and \ensuremath{\Varid{y}} must be terms from our abstract syntax.
+
+To form the definition of \ensuremath{\Conid{MapE}}, we simply build a function for
+mapping \ensuremath{\Varid{g}} onto each expression type and encapsulate the result
+appropriately using the \ensuremath{\Conid{L}} and \ensuremath{\Conid{R}} constructors.  \ensuremath{\Varid{map1}} and \ensuremath{\Varid{map2}}
+provide the appropriate mapping functions for each expression type and
+we know that expressions of type \ensuremath{\Varid{E}_1} should be encapsulated with \ensuremath{\Conid{L}}
+and those of type \ensuremath{\Varid{E}_2} with \ensuremath{\Conid{R}}.  Thus, it is simple to build a
+function for each element of the abstract syntax by composing
+encapsulation and map functions.  \ensuremath{\Conid{L}\mathbin{\circ}\Varid{map1}\;\Varid{g}} is a function that maps
+\ensuremath{\Varid{g}} onto its argument of type \ensuremath{\Varid{E}_1} and encapsulates the result with
+\ensuremath{\Conid{L}}.  Similarly, \ensuremath{\Conid{R}\mathbin{\circ}\Varid{map2}\;\Varid{g}} is a function that operates on
+expressions of type \ensuremath{\Varid{E}_2}.
+
+Assembling the functions is easily achieved using the \ensuremath{\mathbin{<+>}} operation
+from \ensuremath{\Conid{Sum}}.  This operation simply examines its argument and
+determines whether it is encapsulated with \ensuremath{\Conid{L}} or \ensuremath{\Conid{R}}. If \ensuremath{\Conid{L}}, the
+first function argument is selected and applied.  If \ensuremath{\Conid{R}}, the second.
+Thus, \ensuremath{\Varid{map}_E} composes \ensuremath{\Varid{map1}} and \ensuremath{\Varid{map2}} to form a mapping function
+that works on all term types.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{map}_E\mathbin{::}(\Varid{x}\to \Varid{y})\to (\Conid{E}\;\Varid{x}\to \Conid{E}\;\Varid{y})}$\\
+${\Varid{map}_E\;\Varid{g}\mathrel{=}(\Conid{L}\mathbin{\circ}\Varid{map1}\;\Varid{g})\mathbin{<+>}(\Conid{R}\mathbin{\circ}\Varid{map2}\;\Varid{g})}$
+\end{tabbing}
+Building \ensuremath{\Conid{PhiE}} is analogous to building \ensuremath{\Varid{map}_E}, except that the
+domain argument is already encapsulated with \ensuremath{\Conid{L}} or \ensuremath{\Conid{R}}.  This, the
+composition operator is used directly to compose \ensuremath{\Varid{\phi_1}} and \ensuremath{\Varid{\phi_2}}.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{\phi}_E\mathbin{::}\Conid{E}\;\Conid{Int}\to \Conid{Int}}$\\
+${\Varid{\phi}_E\mathrel{=}\Varid{\phi_1}\mathbin{<+>}\Varid{\phi_2}}$
+\end{tabbing}
+Building \ensuremath{\Conid{EvalE}} is exactly analogous to building \ensuremath{\Conid{Eval1}} or \ensuremath{\Conid{Eval2}}.
+\ensuremath{\Conid{EvalE}} is first mapped onto the expression to evaluate sub-terms and
+\ensuremath{\Varid{\phi}_E} associates the result with its operational semantics.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{eval}_E\mathbin{::}\Conid{Expr}\to \Conid{Int}}$\\
+${\Varid{eval}_E\;(\Conid{InE}\;\Varid{e})\mathrel{=}\Varid{\phi}_E\;(\Varid{map}_E\;\Varid{eval}_E\;\Varid{e})}$
+\end{tabbing}
+Following are some examples of expressions being evaluated.  These
+things aren't trivial to figure out from the paper because there are
+no example expressions.  Note that the constructors for the sum type
+must be specified along with the actual value.  Further, the
+constructor for the outermost expression must also be present as well.
+I didn't anticipate this when I went through the examples the first
+time.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mbox{\qquad-{}-  Return the value 1}}$\\
+${\Varid{test}_0\mathrel{=}\Varid{eval}_E\;(\Conid{InE}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1})))}$\\
+${}$\\
+${\mbox{\qquad-{}-  Add 1 and 1}}$\\
+${\Varid{test}_1\mathrel{=}\Varid{eval}_E\;(\Conid{InE}\;(\Conid{L}\;(\Conid{Add}\;(\Conid{InE}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1})))\;(\Conid{InE}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1}))))))}$\\
+${}$\\
+${\mbox{\qquad-{}-  Divide 1 by 1}}$\\
+${\Varid{test}_2\mathrel{=}\Varid{eval}_E\;(\Conid{InE}}$\\
+${\phantom{\Varid{test}_2\mathrel{=}\Varid{eval}_E\;(\mbox{}}(\Conid{R}\;(\Conid{Dvd}}$\\
+${\phantom{\Varid{test}_2\mathrel{=}\Varid{eval}_E\;(\mbox{}}\phantom{(\Conid{R}\;(\mbox{}}(\Conid{InE}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1})))}$\\
+${\phantom{\Varid{test}_2\mathrel{=}\Varid{eval}_E\;(\mbox{}}\phantom{(\Conid{R}\;(\mbox{}}(\Conid{InE}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1}))))))}$\\
+${}$\\
+${\mbox{\qquad-{}-  Divide 1 by 0}}$\\
+${\Varid{test}_3\mathrel{=}\Varid{eval}_E\;(\Conid{InE}}$\\
+${\phantom{\Varid{test}_3\mathrel{=}\Varid{eval}_E\;(\mbox{}}(\Conid{R}\;(\Conid{Dvd}}$\\
+${\phantom{\Varid{test}_3\mathrel{=}\Varid{eval}_E\;(\mbox{}}\phantom{(\Conid{R}\;(\mbox{}}(\Conid{InE}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1})))}$\\
+${\phantom{\Varid{test}_3\mathrel{=}\Varid{eval}_E\;(\mbox{}}\phantom{(\Conid{R}\;(\mbox{}}(\Conid{InE}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{0}))))))}$\\
+${}$\\
+${\mbox{\qquad-{}-  Divide 1 by 1 and add 1}}$\\
+${\Varid{test}_4\mathrel{=}\Varid{eval}_E\;(\Conid{InE}}$\\
+${\phantom{\Varid{test}_4\mathrel{=}\Varid{eval}_E\;(\mbox{}}(\Conid{L}\;(\Conid{Add}}$\\
+${\phantom{\Varid{test}_4\mathrel{=}\Varid{eval}_E\;(\mbox{}}\phantom{(\Conid{L}\;(\mbox{}}(\Conid{InE}\;(\Conid{R}\;(\Conid{Dvd}}$\\
+${\phantom{\Varid{test}_4\mathrel{=}\Varid{eval}_E\;(\mbox{}}\phantom{(\Conid{L}\;(\mbox{}}\phantom{(\Conid{InE}\;(\Conid{R}\;(\mbox{}}(\Conid{InE}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1})))}$\\
+${\phantom{\Varid{test}_4\mathrel{=}\Varid{eval}_E\;(\mbox{}}\phantom{(\Conid{L}\;(\mbox{}}\phantom{(\Conid{InE}\;(\Conid{R}\;(\mbox{}}(\Conid{InE}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1}))))))}$\\
+${\phantom{\Varid{test}_4\mathrel{=}\Varid{eval}_E\;(\mbox{}}\phantom{(\Conid{L}\;(\mbox{}}(\Conid{InE}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1}))))))}$
+\end{tabbing}
+\section{Second Try Plus Multiplication}
+
+So what's the point?  Duponcheel has taken a pretty simple interpreter
+and obfuscated it to give us an interpreter that uses what will become
+fixed point types.  To demonstrate the point, we'll extend the Second
+Try interpreter to include a new term that performs multiplication.
+Although all the code is repeated here, it is surprising how little is
+modified.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{module}\;\Conid{SecondTryPlus}\;\mathbf{where}}$
+\end{tabbing}
+The definitions for \ensuremath{\Varid{E}_1} and \ensuremath{\Varid{E}_2} are unchanged.  A new, separate
+definition is added for \ensuremath{\Varid{E}_3} to represent multiplication terms:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Varid{E}_1\;\Varid{x}}$\\
+${\hskip2.00em\relax\mathrel{=}\Conid{Num}\;\Conid{Int}}$\\
+${\hskip2.00em\relax\mid \Conid{Add}\;\Varid{x}\;\Varid{x}}$\\
+${\hskip2.00em\relax\phantom{\mid \mbox{}}\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$\\
+${}$\\
+${\mathbf{data}\;\Varid{E}_2\;\Varid{x}\mathrel{=}\Conid{Dvd}\;\Varid{x}\;\Varid{x}\;\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$\\
+${}$\\
+${\mathbf{data}\;\Varid{E}_3\;\Varid{x}\mathrel{=}\Conid{Mul}\;\Varid{x}\;\Varid{x}\;\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$
+\end{tabbing}
+The definitions for \ensuremath{\Varid{Expr}_1} and \ensuremath{\Varid{Expr}_2} are unchanged.  A new
+definition for \ensuremath{\Varid{Expr}_3} representing multiplication is added.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Varid{Expr}_1\mathrel{=}\Conid{In1}\;(\Varid{E}_1\;\Varid{Expr}_1)\;\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$\\
+${}$\\
+${\mathbf{data}\;\Varid{Expr}_2\mathrel{=}\Conid{In2}\;(\Varid{E}_2\;\Varid{Expr}_2)\;\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$\\
+${}$\\
+${\mathbf{data}\;\Varid{Expr}_3\mathrel{=}\Conid{In3}\;(\Varid{E}_3\;\Varid{Expr}_3)\;\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$
+\end{tabbing}
+Semantic functions also remain unchanged.  A function for
+multiplication is added:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{num}\mathrel{=}\Varid{id}\mbox{\qquad-{}-  Define semantics of num}}$\\
+${\Varid{add}\;\Varid{x}\;\Varid{y}\mathrel{=}\Varid{x}\mathbin{+}\Varid{y}\mbox{\qquad-{}-  Define semantics of add}}$\\
+${\Varid{dvd}\;\Varid{x}\;\Varid{y}\mathrel{=}\mathbf{if}\;\Varid{y}\equiv \mathrm{0}\mbox{\qquad-{}-  Define semantics of divide}}$\\
+${\phantom{\Varid{dvd}\;\Varid{x}\;\Varid{y}\mathrel{=}\mbox{}}\mathbf{then}\;\Varid{error}\;\text{\tt \char34 Divide~by~zero\char34}}$\\
+${\phantom{\Varid{dvd}\;\Varid{x}\;\Varid{y}\mathrel{=}\mbox{}}\mathbf{else}\;\Varid{x}\mathbin{\Varid{`div`}}\Varid{y}}$\\
+${\Varid{mul}\;\Varid{x}\;\Varid{y}\mathrel{=}\Varid{x}\mathbin{*}\Varid{y}\mbox{\qquad-{}-  Define semantics of times}}$
+\end{tabbing}
+The original \ensuremath{\Varid{map}} and \ensuremath{\Varid{\phi}} functions again remain unmodified.
+\ensuremath{\Varid{map3}} and \ensuremath{\Varid{\phi_3}} are added for multiplication operations.  \ensuremath{\Varid{eval}_3} is
+also added to show that we can build an interpreter separately for
+multiplication.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{map1}\mathbin{::}(\Varid{x}\to \Varid{y})\to (\Varid{E}_1\;\Varid{x}\to \Varid{E}_1\;\Varid{y})}$\\
+${\Varid{map1}\;\Varid{g}\;(\Conid{Num}\;\Varid{n})\mathrel{=}\Conid{Num}\;\Varid{n}}$\\
+${\Varid{map1}\;\Varid{g}\;(\Conid{Add}\;\Varid{e}\;\Varid{f})\mathrel{=}(\Conid{Add}\;(\Varid{g}\;\Varid{e})\;(\Varid{g}\;\Varid{f}))}$\\
+${}$\\
+${\Varid{map2}\mathbin{::}(\Varid{x}\to \Varid{y})\to (\Varid{E}_2\;\Varid{x}\to \Varid{E}_2\;\Varid{y})}$\\
+${\Varid{map2}\;\Varid{g}\;(\Conid{Dvd}\;\Varid{e}\;\Varid{f})\mathrel{=}(\Conid{Dvd}\;(\Varid{g}\;\Varid{e})\;(\Varid{g}\;\Varid{f}))}$\\
+${}$\\
+${\Varid{map3}\mathbin{::}(\Varid{x}\to \Varid{y})\to (\Varid{E}_3\;\Varid{x}\to \Varid{E}_3\;\Varid{y})}$\\
+${\Varid{map3}\;\Varid{g}\;(\Conid{Mul}\;\Varid{e}\;\Varid{f})\mathrel{=}(\Conid{Mul}\;(\Varid{g}\;\Varid{e})\;(\Varid{g}\;\Varid{f}))}$\\
+${}$\\
+${\Varid{\phi_1}\mathbin{::}\Varid{E}_1\;\Conid{Int}\to \Conid{Int}}$\\
+${\Varid{\phi_1}\;(\Conid{Num}\;\Varid{n})\mathrel{=}\Varid{num}\;\Varid{n}}$\\
+${\Varid{\phi_1}\;(\Conid{Add}\;\Varid{e}\;\Varid{f})\mathrel{=}\Varid{e}\mathbin{`\Varid{add}`}\Varid{f}}$\\
+${}$\\
+${\Varid{\phi_2}\mathbin{::}\Varid{E}_2\;\Conid{Int}\to \Conid{Int}}$\\
+${\Varid{\phi_2}\;(\Conid{Dvd}\;\Varid{e}\;\Varid{f})\mathrel{=}\Varid{e}\mathbin{`\Varid{dvd}`}\Varid{f}}$\\
+${}$\\
+${\Varid{\phi_3}\mathbin{::}\Varid{E}_3\;\Conid{Int}\to \Conid{Int}}$\\
+${\Varid{\phi_3}\;(\Conid{Mul}\;\Varid{e}\;\Varid{f})\mathrel{=}\Varid{e}\mathbin{`\Varid{mul}`}\Varid{f}}$\\
+${}$\\
+${\Varid{eval}_1\mathbin{::}\Varid{Expr}_1\to \Conid{Int}}$\\
+${\Varid{eval}_1\;(\Conid{In1}\;\Varid{e1})\mathrel{=}\Varid{\phi_1}\;(\Varid{map1}\;\Varid{eval}_1\;\Varid{e1})}$\\
+${}$\\
+${\Varid{eval}_2\mathbin{::}\Varid{Expr}_2\to \Conid{Int}}$\\
+${\Varid{eval}_2\;(\Conid{In2}\;\Varid{e2})\mathrel{=}\Varid{\phi_2}\;(\Varid{map2}\;\Varid{eval}_2\;\Varid{e2})}$\\
+${}$\\
+${\Varid{eval}_3\mathbin{::}\Varid{Expr}_3\to \Conid{Int}}$\\
+${\Varid{eval}_3\;(\Conid{In3}\;\Varid{e3})\mathrel{=}\Varid{\phi_3}\;(\Varid{map3}\;\Varid{eval}_3\;\Varid{e3})}$
+\end{tabbing}
+The definition for sum does not change.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{Sum}\;\Varid{x}\;\Varid{y}\mathrel{=}\Conid{L}\;\Varid{x}\mid \Conid{R}\;\Varid{y}\;\mathbf{deriving}\;(\Conid{Show},\Conid{Eq})}$\\
+${}$\\
+${(\mathbin{<+>})\mathbin{::}(\Varid{x}\to \Varid{z})\to (\Varid{y}\to \Varid{z})\to (\Conid{Sum}\;\Varid{x}\;\Varid{y}\to \Varid{z})}$\\
+${\Varid{l}\mathbin{<+>}\Varid{r}\mathrel{=}\lambda \Varid{s}\to \mathbf{case}\;\Varid{s}\;\mathbf{of}}$\\
+${\phantom{\Varid{l}\mathbin{<+>}\Varid{r}\mathrel{=}\lambda \Varid{s}\to \mathbf{case}\;\Varid{s}\;\mbox{}}\Conid{L}\;\Varid{x}\to \Varid{l}\;\Varid{x}}$\\
+${\phantom{\Varid{l}\mathbin{<+>}\Varid{r}\mathrel{=}\lambda \Varid{s}\to \mathbf{case}\;\Varid{s}\;\mbox{}}\Conid{R}\;\Varid{x}\to \Varid{r}\;\Varid{x}}$
+\end{tabbing}
+All we have done to this point is define an interpreter for
+multiplication operations by defining \ensuremath{\Varid{map}}, \ensuremath{\Varid{\phi}} and \ensuremath{\Varid{eval}} for the
+new abstract syntax.  None of the previous definitions have been
+modified in any way.  We will now integrate the multiplication syntax
+into the abstract syntax for the entire language and integrate the
+interpreters.
+
+First, define a type shorthand that adds E3 to the expression.
+Effectively, the abstract syntax for expressions becomes:
+
+\begin{alltt}
+  (Sum multiplication (Sum division addition)) 
+\end{alltt}
+
+The \ensuremath{\Conid{Expr}} data structure does not change.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{type}\;\Conid{E}\;\Varid{x}\mathrel{=}\Conid{Sum}\;(\Varid{E}_3\;\Varid{x})\;(\Conid{Sum}\;(\Varid{E}_1\;\Varid{x})\;(\Varid{E}_2\;\Varid{x}))}$\\
+${}$\\
+${\mathbf{data}\;\Conid{Expr}\mathrel{=}\Conid{InE}\;(\Conid{E}\;\Conid{Expr})}$
+\end{tabbing}
+\ensuremath{\Varid{map}_E} uses the sum composition operator to map an operation across
+the entire expression abstract syntax.  The signature does not change.
+The function body rebuilds the expression around the application of
+map to each possible expression type.  Note the use of \ensuremath{\Conid{R}} and \ensuremath{\Conid{L}} to
+build what is in effect a tree containing possible expressions.  Any
+number of expressions can be added in this way.  \ensuremath{\Varid{\phi}_E} is similarly
+modified and \ensuremath{\Varid{eval}_E} remains unchanged.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{map}_E\mathbin{::}(\Varid{x}\to \Varid{y})\to (\Conid{E}\;\Varid{x}\to \Conid{E}\;\Varid{y})}$\\
+${\Varid{map}_E\;\Varid{g}\mathrel{=}(\Conid{L}\mathbin{\circ}\Varid{map3}\;\Varid{g})\mathbin{<+>}((\Conid{R}\mathbin{\circ}\Conid{L}\mathbin{\circ}\Varid{map1}\;\Varid{g})\mathbin{<+>}(\Conid{R}\mathbin{\circ}\Conid{R}\mathbin{\circ}\Varid{map2}\;\Varid{g}))}$\\
+${}$\\
+${\Varid{\phi}_E\mathbin{::}\Conid{E}\;\Conid{Int}\to \Conid{Int}}$\\
+${\Varid{\phi}_E\mathrel{=}\Varid{\phi_3}\mathbin{<+>}(\Varid{\phi_1}\mathbin{<+>}\Varid{\phi_2})}$\\
+${}$\\
+${\Varid{eval}_E\mathbin{::}\Conid{Expr}\to \Conid{Int}}$\\
+${\Varid{eval}_E\;(\Conid{InE}\;\Varid{e})\mathrel{=}\Varid{\phi}_E\;(\Varid{map}_E\;\Varid{eval}_E\;\Varid{e})}$
+\end{tabbing}
+Following are more examples the integrate multiplication.  Note how
+\ensuremath{\Conid{R}} and \ensuremath{\Conid{L}} must be used together to construct some terms.  This is
+painful without a concrete syntax to compile from, but simple when
+writing compilers that automatically generate structures.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mbox{\qquad-{}-  Return the value 1}}$\\
+${\Varid{test}_0\mathrel{=}\Varid{eval}_E\;(\Conid{InE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1}))))}$\\
+${}$\\
+${\mbox{\qquad-{}-  Add 1 and 1}}$\\
+${\Varid{test}_1\mathrel{=}\Varid{eval}_E\;(\Conid{InE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Add}\;(\Conid{InE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1}))))\;(\Conid{InE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1}))))))))}$\\
+${}$\\
+${\mbox{\qquad-{}-  Divide 1 by 1}}$\\
+${\Varid{test}_2\mathrel{=}\Varid{eval}_E\;(\Conid{InE}\;(\Conid{R}\;(\Conid{R}\;(\Conid{Dvd}\;(\Conid{InE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1}))))\;(\Conid{InE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1}))))))))}$\\
+${}$\\
+${\Varid{test}_3\mathrel{=}\Varid{eval}_E\;(\Conid{InE}\;(\Conid{L}\;(\Conid{Mul}\;(\Conid{InE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{2}))))\;(\Conid{InE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{2})))))))}$\\
+${}$\\
+${\Varid{test}_4\mathrel{=}\Varid{eval}_E\;(\Conid{InE}\;(\Conid{R}\;(\Conid{R}\;(\Conid{Dvd}\;(\Conid{InE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1}))))\;(\Conid{InE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1}))))))))}$
+\end{tabbing}
+Now that we've done it the hard way, let's make things easier by
+defining names for operators and operands.  Define some useful
+variables and functions that provide a kind of ad hoc syntax that we'll use
+to define expressions.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{num1}\mathrel{=}(\Conid{InE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1}))))}$\\
+${\Varid{num2}\mathrel{=}(\Conid{InE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{2}))))}$\\
+${\Varid{num3}\mathrel{=}(\Conid{InE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{3}))))}$\\
+${\Varid{numx}\;\Varid{x}\mathrel{=}(\Conid{InE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Num}\;\Varid{x}))))}$\\
+${\Varid{divide}\;\Varid{x}\;\Varid{y}\mathrel{=}(\Conid{InE}\;(\Conid{R}\;(\Conid{R}\;(\Conid{Dvd}\;\Varid{x}\;\Varid{y}))))}$\\
+${\Varid{times}\;\Varid{x}\;\Varid{y}\mathrel{=}(\Conid{InE}\;(\Conid{L}\;(\Conid{Mul}\;\Varid{x}\;\Varid{y})))}$\\
+${\Varid{plus}\;\Varid{x}\;\Varid{y}\mathrel{=}(\Conid{InE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Add}\;\Varid{x}\;\Varid{y}))))}$
+\end{tabbing}
+We can now write expressions that look much more like we think they
+should.  Use evalE to evaluate the following examples:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{test}_5\mathrel{=}(\Varid{num2}\mathbin{`\Varid{times}`}\Varid{num3})}$\\
+${}$\\
+${\Varid{test}_6\mathrel{=}(\Varid{num1}\mathbin{`\Varid{plus}`}(\Varid{num2}\mathbin{`\Varid{divide}`}\Varid{num3}))}$\\
+${}$\\
+${\Varid{test}_7\mathrel{=}(\Varid{num1}\mathbin{`\Varid{plus}`}(\Varid{num3}\mathbin{`\Varid{divide}`}\Varid{num2}))}$\\
+${}$\\
+${\Varid{test}_8\mathrel{=}(\Varid{num2}\mathbin{`\Varid{times}`}(\Varid{numx}\;\mathrm{100}))}$\\
+${}$\\
+${\Varid{test}_9\mathrel{=}(\Varid{num2}\mathbin{`\Varid{divide}`}(\Varid{numx}\;\mathrm{0}))}$
+\end{tabbing}
+Any reasonable assessment of this interpreter reveals that to add a
+new term type to the interpreter, we simply need to define an
+interpreter for that term type and compose it with those that already
+exist.  Composing the new evaluation function is quite systematic and
+achieved using features of the \ensuremath{\Conid{Sum}} type constructor.  No
+modification is required for existing interpreter modules.  In
+addition to dramatically simplifying interpreter construction,
+debugging becomes much simpler as the new interpreter can be tested
+and debugged in a modular fashion.
+\section{Third Try}
+
+The Third Try from Duponcheel attempts to abstract common structures
+from individual interpreters and syntax into a common form.  The
+result is a parameterized data structure that forms fixed point forms
+in a common, consistent manner.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{module}\;\Conid{ThirdTry}\;\mathbf{where}}$
+\end{tabbing}
+All the \ensuremath{\Conid{Expr}} types from \ensuremath{\Conid{SecondTry}} share a common form that can be
+abstracted and parameterized as \ensuremath{\Conid{Rec}}:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{Rec}\;\Varid{f}\mathrel{=}\Conid{In}\;(\Varid{f}\;(\Conid{Rec}\;\Varid{f}))}$
+\end{tabbing}
+The \ensuremath{\Conid{Rec}} type creates a fixed point data type from some element \ensuremath{\Varid{f}}.
+Note the constructor \ensuremath{\Conid{In}} that accomplishes the same task as \ensuremath{\Conid{In1}},
+\ensuremath{\Conid{In2}}, and \ensuremath{\Conid{InE}} from previous examples.
+
+We will need to define abstract syntax for each expression type.
+These definitions do not change from earlier examples, they will
+simply be packaged differently for the interpreter.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Varid{E}_1\;\Varid{x}}$\\
+${\hskip2.00em\relax\mathrel{=}\Conid{Num}\;\Conid{Int}}$\\
+${\hskip2.00em\relax\mid \Conid{Add}\;\Varid{x}\;\Varid{x}}$\\
+${\hskip2.00em\relax\phantom{\mid \mbox{}}\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$\\
+${}$\\
+${\mathbf{data}\;\Varid{E}_2\;\Varid{x}\mathrel{=}\Conid{Dvd}\;\Varid{x}\;\Varid{x}\;\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$
+\end{tabbing}
+Now use \ensuremath{\Conid{Rec}} to define fixed point types for \ensuremath{\Varid{Expr}_1} and \ensuremath{\Varid{Expr}_2}.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{type}\;\Varid{Expr}_1\mathrel{=}\Conid{Rec}\;\Varid{E}_1}$\\
+${\mathbf{type}\;\Varid{Expr}_2\mathrel{=}\Conid{Rec}\;\Varid{E}_2}$
+\end{tabbing}
+The definitions for semantic functions, \ensuremath{\Varid{map}}, \ensuremath{\Varid{\phi}}, and \ensuremath{\Varid{eval}}
+functions for each expression do not change.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{num}\mathrel{=}\Varid{id}\mbox{\qquad-{}-  Num1 Int}}$\\
+${\Varid{add}\;\Varid{x}\;\Varid{y}\mathrel{=}\Varid{x}\mathbin{+}\Varid{y}\mbox{\qquad-{}-  Add1 Expr1 Expr1}}$\\
+${\Varid{dvd}\;\Varid{x}\;\Varid{y}\mathrel{=}\mathbf{if}\;\Varid{y}\equiv \mathrm{0}\;\mathbf{then}\;\Varid{error}\;\text{\tt \char34 Divide~by~zero\char34}\;\mathbf{else}\;\Varid{x}\mathbin{\Varid{`div`}}\Varid{y}}$\\
+${}$\\
+${\Varid{map1}\mathbin{::}(\Varid{x}\to \Varid{y})\to (\Varid{E}_1\;\Varid{x}\to \Varid{E}_1\;\Varid{y})}$\\
+${\Varid{map1}\;\Varid{g}\;(\Conid{Num}\;\Varid{n})\mathrel{=}\Conid{Num}\;\Varid{n}}$\\
+${\Varid{map1}\;\Varid{g}\;(\Conid{Add}\;\Varid{e}\;\Varid{f})\mathrel{=}(\Conid{Add}\;(\Varid{g}\;\Varid{e})\;(\Varid{g}\;\Varid{f}))}$\\
+${}$\\
+${\Varid{map2}\mathbin{::}(\Varid{x}\to \Varid{y})\to (\Varid{E}_2\;\Varid{x}\to \Varid{E}_2\;\Varid{y})}$\\
+${\Varid{map2}\;\Varid{g}\;(\Conid{Dvd}\;\Varid{e}\;\Varid{f})\mathrel{=}(\Conid{Dvd}\;(\Varid{g}\;\Varid{e})\;(\Varid{g}\;\Varid{f}))}$\\
+${}$\\
+${\Varid{\phi_1}\mathbin{::}\Varid{E}_1\;\Conid{Int}\to \Conid{Int}}$\\
+${\Varid{\phi_1}\;(\Conid{Num}\;\Varid{n})\mathrel{=}\Varid{num}\;\Varid{n}}$\\
+${\Varid{\phi_1}\;(\Conid{Add}\;\Varid{e}\;\Varid{f})\mathrel{=}\Varid{e}\mathbin{`\Varid{add}`}\Varid{f}}$\\
+${}$\\
+${\Varid{\phi_2}\mathbin{::}\Varid{E}_2\;\Conid{Int}\to \Conid{Int}}$\\
+${\Varid{\phi_2}\;(\Conid{Dvd}\;\Varid{e}\;\Varid{f})\mathrel{=}\Varid{e}\mathbin{`\Varid{dvd}`}\Varid{f}}$\\
+${}$\\
+${\Varid{eval}_1\mathbin{::}\Varid{Expr}_1\to \Conid{Int}}$\\
+${\Varid{eval}_1\;(\Conid{In}\;\Varid{e1})\mathrel{=}\Varid{\phi_1}\;(\Varid{map1}\;\Varid{eval}_1\;\Varid{e1})}$\\
+${}$\\
+${\Varid{eval}_2\mathbin{::}\Varid{Expr}_2\to \Conid{Int}}$\\
+${\Varid{eval}_2\;(\Conid{In}\;\Varid{e2})\mathrel{=}\Varid{\phi_2}\;(\Varid{map2}\;\Varid{eval}_2\;\Varid{e2})}$
+\end{tabbing}
+The definition of \ensuremath{\Conid{Sum}} remains unchanged:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{Sum}\;\Varid{x}\;\Varid{y}\mathrel{=}\Conid{L}\;\Varid{x}\mid \Conid{R}\;\Varid{y}\;\mathbf{deriving}\;(\Conid{Show},\Conid{Eq})}$\\
+${}$\\
+${(\mathbin{<+>})\mathbin{::}(\Varid{x}\to \Varid{z})\to (\Varid{y}\to \Varid{z})\to (\Conid{Sum}\;\Varid{x}\;\Varid{y}\to \Varid{z})}$\\
+${\Varid{l}\mathbin{<+>}\Varid{r}\mathrel{=}\lambda \Varid{s}\to \mathbf{case}\;\Varid{s}\;\mathbf{of}}$\\
+${\phantom{\Varid{l}\mathbin{<+>}\Varid{r}\mathrel{=}\lambda \Varid{s}\to \mathbf{case}\;\Varid{s}\;\mbox{}}\Conid{L}\;\Varid{x}\to \Varid{l}\;\Varid{x}}$\\
+${\phantom{\Varid{l}\mathbin{<+>}\Varid{r}\mathrel{=}\lambda \Varid{s}\to \mathbf{case}\;\Varid{s}\;\mbox{}}\Conid{R}\;\Varid{x}\to \Varid{r}\;\Varid{x}}$
+\end{tabbing}
+Now the fun begins.  An expression in our language is the sum of the
+expression for addition and division.  Thus, we use the \ensuremath{\Conid{Sum}} type to
+do our composition.  In Gopher, the \ensuremath{\mathbf{type}} constructor behaves
+differently than the \ensuremath{\mathbf{type}} synonym definition operator in Haskell.
+Thus, the definition is altered to use \ensuremath{\mathbf{newtype}} requiring the
+insertion of a new type constructor, \ensuremath{\Conid{MkE}}.  In addition, an
+un-constructor is defined to pull data out of \ensuremath{\Conid{MkE}}.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{newtype}\;\Conid{E}\;\Varid{x}\mathrel{=}\Conid{MkE}\;(\Conid{Sum}\;(\Varid{E}_1\;\Varid{x})\;(\Varid{E}_2\;\Varid{x}))}$\\
+${}$\\
+${\Varid{unE}\;(\Conid{MkE}\;\Varid{x})\mathrel{=}\Varid{x}}$
+\end{tabbing}
+The composite \ensuremath{\Conid{Expr}} definition is the fixed point type created from
+\ensuremath{\Conid{E}} that we just defined.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{type}\;\Conid{Expr}\mathrel{=}\Conid{Rec}\;\Conid{E}}$
+\end{tabbing}
+The map function for the composite expression, \ensuremath{\Conid{E}}, is basically the
+same function with the addition of functions to accommodate the \ensuremath{\Conid{MkE}}
+constructor we had to introduce earlier. Specifically, \ensuremath{\Varid{map}_E} must
+first extract the expression from the \ensuremath{\Conid{MkE}} constructor because the
+individual map functions aren't aware of the need to package the
+expression.  Once processed, the expression is repackaged.  Similarly,
+\ensuremath{\Varid{\phi}_E} must un-package its argument.  Because it is making a semantic
+mapping, its result should not be repackaged.  \ensuremath{\Varid{eval}_E} does not
+change.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{map}_E\mathbin{::}(\Varid{x}\to \Varid{y})\to (\Conid{E}\;\Varid{x}\to \Conid{E}\;\Varid{y})}$\\
+${\Varid{map}_E\;\Varid{g}\mathrel{=}\Conid{MkE}\mathbin{\circ}((\Conid{L}\mathbin{\circ}\Varid{map1}\;\Varid{g})\mathbin{<+>}(\Conid{R}\mathbin{\circ}\Varid{map2}\;\Varid{g}))\mathbin{\circ}\Varid{unE}}$\\
+${}$\\
+${\Varid{\phi}_E\mathbin{::}\Conid{E}\;\Conid{Int}\to \Conid{Int}}$\\
+${\Varid{\phi}_E\mathrel{=}(\Varid{\phi_1}\mathbin{<+>}\Varid{\phi_2})\mathbin{\circ}\Varid{unE}}$\\
+${}$\\
+${\Varid{eval}_E\mathbin{::}\Conid{Expr}\to \Conid{Int}}$\\
+${\Varid{eval}_E\;(\Conid{In}\;\Varid{e})\mathrel{=}\Varid{\phi}_E\;(\Varid{map}_E\;\Varid{eval}_E\;\Varid{e})}$
+\end{tabbing}
+Again, some examples to try out.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mbox{\qquad-{}-  Return the value 1}}$\\
+${\Varid{test}_0\mathrel{=}\Varid{eval}_E\;(\Conid{In}\;(\Conid{MkE}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1}))))}$\\
+${}$\\
+${\mbox{\qquad-{}-  Add 1 and 1}}$\\
+${\Varid{test}_1\mathrel{=}\Varid{eval}_E\;(\Conid{In}\;(\Conid{MkE}}$\\
+${\phantom{\Varid{test}_1\mathrel{=}\Varid{eval}_E\;(\Conid{In}\;(\mbox{}}(\Conid{L}\;(\Conid{Add}}$\\
+${\phantom{\Varid{test}_1\mathrel{=}\Varid{eval}_E\;(\Conid{In}\;(\mbox{}}\phantom{(\Conid{L}\;(\mbox{}}(\Conid{In}\;(\Conid{MkE}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1}))))}$\\
+${\phantom{\Varid{test}_1\mathrel{=}\Varid{eval}_E\;(\Conid{In}\;(\mbox{}}\phantom{(\Conid{L}\;(\mbox{}}(\Conid{In}\;(\Conid{MkE}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1}))))))))}$\\
+${}$\\
+${\mbox{\qquad-{}-  Divide 1 by 1}}$\\
+${\Varid{test}_2\mathrel{=}\Varid{eval}_E\;(\Conid{In}\;(\Conid{MkE}}$\\
+${\phantom{\Varid{test}_2\mathrel{=}\Varid{eval}_E\;(\Conid{In}\;(\mbox{}}(\Conid{R}\;(\Conid{Dvd}}$\\
+${\phantom{\Varid{test}_2\mathrel{=}\Varid{eval}_E\;(\Conid{In}\;(\mbox{}}\phantom{(\Conid{R}\;(\mbox{}}(\Conid{In}\;(\Conid{MkE}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1}))))}$\\
+${\phantom{\Varid{test}_2\mathrel{=}\Varid{eval}_E\;(\Conid{In}\;(\mbox{}}\phantom{(\Conid{R}\;(\mbox{}}(\Conid{In}\;(\Conid{MkE}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1}))))))))}$
+\end{tabbing}
+\section{Third Try Plus Multiplication}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{module}\;\Conid{ThirdTryPlus}\;\mathbf{where}}$
+\end{tabbing}
+The \ensuremath{\Conid{Rec}} type remains unchanged.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{Rec}\;\Varid{f}\mathrel{=}\Conid{In}\;(\Varid{f}\;(\Conid{Rec}\;\Varid{f}))}$
+\end{tabbing}
+Abstract syntax is added for multiplication.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Varid{E}_1\;\Varid{x}}$\\
+${\hskip2.00em\relax\mathrel{=}\Conid{Num}\;\Conid{Int}}$\\
+${\hskip2.00em\relax\mid \Conid{Add}\;\Varid{x}\;\Varid{x}}$\\
+${\hskip2.00em\relax\phantom{\mid \mbox{}}\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$\\
+${}$\\
+${\mathbf{data}\;\Varid{E}_2\;\Varid{x}\mathrel{=}\Conid{Dvd}\;\Varid{x}\;\Varid{x}\;\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$\\
+${}$\\
+${\mathbf{data}\;\Varid{E}_3\;\Varid{x}\mathrel{=}\Conid{Mul}\;\Varid{x}\;\Varid{x}\;\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$
+\end{tabbing}
+An expression type is added for multiplication using \ensuremath{\Conid{Rec}}.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{type}\;\Varid{Expr}_1\mathrel{=}\Conid{Rec}\;\Varid{E}_1}$\\
+${\mathbf{type}\;\Varid{Expr}_2\mathrel{=}\Conid{Rec}\;\Varid{E}_2}$\\
+${\mathbf{type}\;\Varid{Expr}_3\mathrel{=}\Conid{Rec}\;\Varid{E}_3}$
+\end{tabbing}
+The definitions for semantic functions, \ensuremath{\Varid{map}}, \ensuremath{\Varid{\phi}}, and \ensuremath{\Varid{eval}}
+functions for each expression do not change.  New instances are added
+for multiplication.  These are identical to those added for Second Try
+Plus Multiplication.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{num}\mathrel{=}\Varid{id}\mbox{\qquad-{}-  Num1 Int}}$\\
+${\Varid{add}\;\Varid{x}\;\Varid{y}\mathrel{=}\Varid{x}\mathbin{+}\Varid{y}\mbox{\qquad-{}-  Add1 Expr1 Expr1}}$\\
+${\Varid{dvd}\;\Varid{x}\;\Varid{y}\mathrel{=}\mathbf{if}\;\Varid{y}\equiv \mathrm{0}\;\mathbf{then}\;\Varid{error}\;\text{\tt \char34 Divide~by~zero\char34}\;\mathbf{else}\;\Varid{x}\mathbin{\Varid{`div`}}\Varid{y}}$\\
+${\Varid{mul}\;\Varid{x}\;\Varid{y}\mathrel{=}\Varid{x}\mathbin{*}\Varid{y}\mbox{\qquad-{}-  Define semantics of times}}$\\
+${}$\\
+${\Varid{map1}\mathbin{::}(\Varid{x}\to \Varid{y})\to (\Varid{E}_1\;\Varid{x}\to \Varid{E}_1\;\Varid{y})}$\\
+${\Varid{map1}\;\Varid{g}\;(\Conid{Num}\;\Varid{n})\mathrel{=}\Conid{Num}\;\Varid{n}}$\\
+${\Varid{map1}\;\Varid{g}\;(\Conid{Add}\;\Varid{e}\;\Varid{f})\mathrel{=}(\Conid{Add}\;(\Varid{g}\;\Varid{e})\;(\Varid{g}\;\Varid{f}))}$\\
+${}$\\
+${\Varid{map2}\mathbin{::}(\Varid{x}\to \Varid{y})\to (\Varid{E}_2\;\Varid{x}\to \Varid{E}_2\;\Varid{y})}$\\
+${\Varid{map2}\;\Varid{g}\;(\Conid{Dvd}\;\Varid{e}\;\Varid{f})\mathrel{=}(\Conid{Dvd}\;(\Varid{g}\;\Varid{e})\;(\Varid{g}\;\Varid{f}))}$\\
+${}$\\
+${\Varid{map3}\mathbin{::}(\Varid{x}\to \Varid{y})\to (\Varid{E}_3\;\Varid{x}\to \Varid{E}_3\;\Varid{y})}$\\
+${\Varid{map3}\;\Varid{g}\;(\Conid{Mul}\;\Varid{e}\;\Varid{f})\mathrel{=}(\Conid{Mul}\;(\Varid{g}\;\Varid{e})\;(\Varid{g}\;\Varid{f}))}$\\
+${}$\\
+${\Varid{\phi_1}\mathbin{::}\Varid{E}_1\;\Conid{Int}\to \Conid{Int}}$\\
+${\Varid{\phi_1}\;(\Conid{Num}\;\Varid{n})\mathrel{=}\Varid{num}\;\Varid{n}}$\\
+${\Varid{\phi_1}\;(\Conid{Add}\;\Varid{e}\;\Varid{f})\mathrel{=}\Varid{e}\mathbin{`\Varid{add}`}\Varid{f}}$\\
+${}$\\
+${\Varid{\phi_2}\mathbin{::}\Varid{E}_2\;\Conid{Int}\to \Conid{Int}}$\\
+${\Varid{\phi_2}\;(\Conid{Dvd}\;\Varid{e}\;\Varid{f})\mathrel{=}\Varid{e}\mathbin{`\Varid{dvd}`}\Varid{f}}$\\
+${}$\\
+${\Varid{\phi_3}\mathbin{::}\Varid{E}_3\;\Conid{Int}\to \Conid{Int}}$\\
+${\Varid{\phi_3}\;(\Conid{Mul}\;\Varid{e}\;\Varid{f})\mathrel{=}\Varid{e}\mathbin{`\Varid{mul}`}\Varid{f}}$\\
+${}$\\
+${\Varid{eval}_1\mathbin{::}\Varid{Expr}_1\to \Conid{Int}}$\\
+${\Varid{eval}_1\;(\Conid{In}\;\Varid{e1})\mathrel{=}\Varid{\phi_1}\;(\Varid{map1}\;\Varid{eval}_1\;\Varid{e1})}$\\
+${}$\\
+${\Varid{eval}_2\mathbin{::}\Varid{Expr}_2\to \Conid{Int}}$\\
+${\Varid{eval}_2\;(\Conid{In}\;\Varid{e2})\mathrel{=}\Varid{\phi_2}\;(\Varid{map2}\;\Varid{eval}_2\;\Varid{e2})}$\\
+${}$\\
+${\Varid{eval}_3\mathbin{::}\Varid{Expr}_3\to \Conid{Int}}$\\
+${\Varid{eval}_3\;(\Conid{In}\;\Varid{e3})\mathrel{=}\Varid{\phi_3}\;(\Varid{map3}\;\Varid{eval}_3\;\Varid{e3})}$
+\end{tabbing}
+The definition of \ensuremath{\Conid{Sum}} remains unchanged:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{Sum}\;\Varid{x}\;\Varid{y}\mathrel{=}\Conid{L}\;\Varid{x}\mid \Conid{R}\;\Varid{y}\;\mathbf{deriving}\;(\Conid{Show},\Conid{Eq})}$\\
+${}$\\
+${(\mathbin{<+>})\mathbin{::}(\Varid{x}\to \Varid{z})\to (\Varid{y}\to \Varid{z})\to (\Conid{Sum}\;\Varid{x}\;\Varid{y}\to \Varid{z})}$\\
+${\Varid{l}\mathbin{<+>}\Varid{r}\mathrel{=}\lambda \Varid{s}\to \mathbf{case}\;\Varid{s}\;\mathbf{of}}$\\
+${\phantom{\Varid{l}\mathbin{<+>}\Varid{r}\mathrel{=}\lambda \Varid{s}\to \mathbf{case}\;\Varid{s}\;\mbox{}}\Conid{L}\;\Varid{x}\to \Varid{l}\;\Varid{x}}$\\
+${\phantom{\Varid{l}\mathbin{<+>}\Varid{r}\mathrel{=}\lambda \Varid{s}\to \mathbf{case}\;\Varid{s}\;\mbox{}}\Conid{R}\;\Varid{x}\to \Varid{r}\;\Varid{x}}$
+\end{tabbing}
+The changes to the composite structure mimic those done to extend try.
+Nothing else changes.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{newtype}\;\Conid{E}\;\Varid{x}\mathrel{=}\Conid{MkE}\;(\Conid{Sum}\;(\Varid{E}_3\;\Varid{x})\;(\Conid{Sum}\;(\Varid{E}_1\;\Varid{x})\;(\Varid{E}_2\;\Varid{x})))}$\\
+${}$\\
+${\Varid{unE}\;(\Conid{MkE}\;\Varid{x})\mathrel{=}\Varid{x}}$\\
+${}$\\
+${\mathbf{type}\;\Conid{Expr}\mathrel{=}\Conid{Rec}\;\Conid{E}}$\\
+${}$\\
+${\Varid{map}_E\mathbin{::}(\Varid{x}\to \Varid{y})\to (\Conid{E}\;\Varid{x}\to \Conid{E}\;\Varid{y})}$\\
+${\Varid{map}_E\;\Varid{g}}$\\
+${\hskip2.00em\relax\mathrel{=}\Conid{MkE}\mathbin{\circ}((\Conid{L}\mathbin{\circ}\Varid{map3}\;\Varid{g})\mathbin{<+>}((\Conid{R}\mathbin{\circ}\Conid{L}\mathbin{\circ}\Varid{map1}\;\Varid{g})\mathbin{<+>}(\Conid{R}\mathbin{\circ}\Conid{R}\mathbin{\circ}\Varid{map2}\;\Varid{g})))\mathbin{\circ}\Varid{unE}}$\\
+${}$\\
+${\Varid{\phi}_E\mathbin{::}\Conid{E}\;\Conid{Int}\to \Conid{Int}}$\\
+${\Varid{\phi}_E\mathrel{=}(\Varid{\phi_3}\mathbin{<+>}(\Varid{\phi_1}\mathbin{<+>}\Varid{\phi_2}))\mathbin{\circ}\Varid{unE}}$\\
+${}$\\
+${\Varid{eval}_E\mathbin{::}\Conid{Expr}\to \Conid{Int}}$\\
+${\Varid{eval}_E\;(\Conid{In}\;\Varid{e})\mathrel{=}\Varid{\phi}_E\;(\Varid{map}_E\;\Varid{eval}_E\;\Varid{e})}$
+\end{tabbing}
+Again, some examples to try out.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mbox{\qquad-{}-  Return the value 1}}$\\
+${\Varid{test}_0\mathrel{=}\Varid{eval}_E\;(\Conid{In}\;(\Conid{MkE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1})))))}$\\
+${}$\\
+${\mbox{\qquad-{}-  Add 1 and 1}}$\\
+${\Varid{test}_1\mathrel{=}\Varid{eval}_E\;(\Conid{In}}$\\
+${\phantom{\Varid{test}_1\mathrel{=}\Varid{eval}_E\;(\mbox{}}(\Conid{MkE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Add}}$\\
+${\phantom{\Varid{test}_1\mathrel{=}\Varid{eval}_E\;(\mbox{}}\phantom{(\Conid{MkE}\;(\Conid{R}\;(\Conid{L}\;(\mbox{}}(\Conid{In}\;(\Conid{MkE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1})))))}$\\
+${\phantom{\Varid{test}_1\mathrel{=}\Varid{eval}_E\;(\mbox{}}\phantom{(\Conid{MkE}\;(\Conid{R}\;(\Conid{L}\;(\mbox{}}(\Conid{In}\;(\Conid{MkE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1}))))))))))}$\\
+${}$\\
+${\mbox{\qquad-{}-  Divide 1 by 1}}$\\
+${\Varid{test}_2\mathrel{=}\Varid{eval}_E\;(\Conid{In}}$\\
+${\phantom{\Varid{test}_2\mathrel{=}\Varid{eval}_E\;(\mbox{}}(\Conid{MkE}\;(\Conid{R}\;(\Conid{R}\;(\Conid{Dvd}}$\\
+${\phantom{\Varid{test}_2\mathrel{=}\Varid{eval}_E\;(\mbox{}}\phantom{(\Conid{MkE}\;(\Conid{R}\;(\Conid{R}\;(\mbox{}}(\Conid{In}\;(\Conid{MkE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1})))))}$\\
+${\phantom{\Varid{test}_2\mathrel{=}\Varid{eval}_E\;(\mbox{}}\phantom{(\Conid{MkE}\;(\Conid{R}\;(\Conid{R}\;(\mbox{}}(\Conid{In}\;(\Conid{MkE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1}))))))))))}$\\
+${}$\\
+${\Varid{test}_3\mathrel{=}\Varid{eval}_E\;(\Conid{In}\;(\Conid{MkE}\;(\Conid{L}\;(\Conid{Mul}}$\\
+${\phantom{\Varid{test}_3\mathrel{=}\Varid{eval}_E\;(\Conid{In}\;(\Conid{MkE}\;(\Conid{L}\;(\mbox{}}(\Conid{In}\;(\Conid{MkE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{2})))))}$\\
+${\phantom{\Varid{test}_3\mathrel{=}\Varid{eval}_E\;(\Conid{In}\;(\Conid{MkE}\;(\Conid{L}\;(\mbox{}}(\Conid{In}\;(\Conid{MkE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{2})))))))))}$\\
+${}$\\
+${\Varid{test}_4\mathrel{=}\Varid{eval}_E\;(\Conid{In}\;(\Conid{MkE}\;(\Conid{R}\;(\Conid{R}\;(\Conid{Dvd}}$\\
+${\phantom{\Varid{test}_4\mathrel{=}\Varid{eval}_E\;(\Conid{In}\;(\Conid{MkE}\;(\Conid{R}\;(\Conid{R}\;(\mbox{}}(\Conid{In}\;(\Conid{MkE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1})))))}$\\
+${\phantom{\Varid{test}_4\mathrel{=}\Varid{eval}_E\;(\Conid{In}\;(\Conid{MkE}\;(\Conid{R}\;(\Conid{R}\;(\mbox{}}(\Conid{In}\;(\Conid{MkE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1}))))))))))}$
+\end{tabbing}
+Again, adding some trivial syntax:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{num1}\mathrel{=}(\Conid{In}\;(\Conid{MkE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{1})))))}$\\
+${\Varid{num2}\mathrel{=}(\Conid{In}\;(\Conid{MkE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{2})))))}$\\
+${\Varid{num3}\mathrel{=}(\Conid{In}\;(\Conid{MkE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Num}\;\mathrm{3})))))}$\\
+${\Varid{numx}\;\Varid{x}\mathrel{=}(\Conid{In}\;(\Conid{MkE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Num}\;\Varid{x})))))}$\\
+${\Varid{divide}\;\Varid{x}\;\Varid{y}\mathrel{=}(\Conid{In}\;(\Conid{MkE}\;(\Conid{R}\;(\Conid{R}\;(\Conid{Dvd}\;\Varid{x}\;\Varid{y})))))}$\\
+${\Varid{times}\;\Varid{x}\;\Varid{y}\mathrel{=}(\Conid{In}\;(\Conid{MkE}\;(\Conid{L}\;(\Conid{Mul}\;\Varid{x}\;\Varid{y}))))}$\\
+${\Varid{plus}\;\Varid{x}\;\Varid{y}\mathrel{=}(\Conid{In}\;(\Conid{MkE}\;(\Conid{R}\;(\Conid{L}\;(\Conid{Add}\;\Varid{x}\;\Varid{y})))))}$\\
+${}$\\
+${\Varid{test}_5\mathrel{=}(\Varid{num2}\mathbin{`\Varid{times}`}\Varid{num3})}$\\
+${}$\\
+${\Varid{test}_6\mathrel{=}(\Varid{num1}\mathbin{`\Varid{plus}`}(\Varid{num2}\mathbin{`\Varid{divide}`}\Varid{num3}))}$\\
+${}$\\
+${\Varid{test}_7\mathrel{=}(\Varid{num1}\mathbin{`\Varid{plus}`}(\Varid{num3}\mathbin{`\Varid{divide}`}\Varid{num2}))}$\\
+${}$\\
+${\Varid{test}_8\mathrel{=}(\Varid{num2}\mathbin{`\Varid{times}`}(\Varid{numx}\;\mathrm{100}))}$\\
+${}$\\
+${\Varid{test}_9\mathrel{=}(\Varid{num2}\mathbin{`\Varid{divide}`}(\Varid{numx}\;\mathrm{0}))}$
+\end{tabbing}
+Once again, we find that extending the interpreter is reasonably easy
+by defining a new interpreter for the new abstract syntax constructs.
+The \ensuremath{\Conid{Rec}} type simplifies this process somewhat and makes the common
+structure of terms clear.  Furthermore, in unequivocally shows that
+the expression data types are in fact fixed point data types.
+
+\section{Functors and Algebras}
+
+The structure of \ensuremath{\Varid{map}} and \ensuremath{\Varid{\phi}} functions have a common form that can
+be abstracted into \ensuremath{\mathbf{class}} definitions.  A \ensuremath{\Conid{Functor}} must define a
+\ensuremath{\Varid{map}} function that takes a function \ensuremath{\Varid{f}} and maps it over a function
+definition.  Definitions for \ensuremath{\Varid{E}_1}, \ensuremath{\Varid{E}_2}, \ensuremath{\Varid{E}_3}, and \ensuremath{\Conid{E}} are all
+functors whose \ensuremath{\Varid{map}} functions are already defined as \ensuremath{\Varid{map1}}, \ensuremath{\Varid{map2}},
+\ensuremath{\Varid{map3}}, and \ensuremath{\Varid{map}_E}.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{class}\;\Conid{Functor}\;\Varid{f}\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{map}\mathbin{::}(\Varid{x}\to \Varid{y})\to (\Varid{f}\;\Varid{x}\to \Varid{f}\;\Varid{y})}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{\Conid{ThirdTryPlus}.Functor}\;\Varid{E}_1\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{map}\mathrel{=}\Varid{map1}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{\Conid{ThirdTryPlus}.Functor}\;\Varid{E}_2\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{map}\mathrel{=}\Varid{map2}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{\Conid{ThirdTryPlus}.Functor}\;\Varid{E}_3\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{map}\mathrel{=}\Varid{map3}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{\Conid{ThirdTryPlus}.Functor}\;\Conid{E}\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{map}\mathrel{=}\Varid{map}_E}$
+\end{tabbing}
+The common structure for \ensuremath{\Varid{\phi}} functions is abstracted as an \ensuremath{\Conid{Algebra}}
+that defines a function, \ensuremath{\Varid{\phi}}, that maps a \ensuremath{\Conid{Functor}}, \ensuremath{\Varid{f}}, and
+argument of type \ensuremath{\Varid{a}} to a value of type \ensuremath{\Varid{a}}.  The \ensuremath{\Varid{\phi}} functions
+define algebras for each expression type.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{class}\;\Conid{\Conid{ThirdTryPlus}.Functor}\;\Varid{f}\Rightarrow \Conid{Algebra}\;\Varid{f}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{\phi}\mathbin{::}\Varid{f}\;\Varid{a}\to \Varid{a}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Algebra}\;\Varid{E}_1\;\Conid{Int}\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{\phi}\mathrel{=}\Varid{\phi_1}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Algebra}\;\Varid{E}_2\;\Conid{Int}\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{\phi}\mathrel{=}\Varid{\phi_2}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Algebra}\;\Varid{E}_3\;\Conid{Int}\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{\phi}\mathrel{=}\Varid{\phi_3}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Algebra}\;\Conid{E}\;\Conid{Int}\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{\phi}\mathrel{=}\Varid{\phi}_E}$
+\end{tabbing}
+We can now define a general \ensuremath{\Varid{eval}} function for all algebras.  Given
+\ensuremath{\Conid{Algebra}\;\Varid{f}\;\Varid{a}}, an \ensuremath{\Varid{eval}} function is directly defined as follows:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{eval}\mathbin{::}\Conid{Algebra}\;\Varid{f}\;\Varid{a}\Rightarrow \Conid{Rec}\;\Varid{f}\to \Varid{a}}$\\
+${\Varid{eval}\;(\Conid{In}\;\Varid{e})\mathrel{=}\Varid{\phi}\;(\Varid{\Conid{ThirdTryPlus}.map}\;\Varid{eval}\;\Varid{e})}$
+\end{tabbing}
+Unfortunately, the general \ensuremath{\Varid{eval}} function doesn't enable enough type
+inference to find a type value for \ensuremath{\Varid{a}}.  Thus, the following \ensuremath{\Varid{evalInt}}
+function is generally defined for evaluation functions that return
+\ensuremath{\Conid{Int}} types:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{evalInt}\mathbin{::}\Conid{Algebra}\;\Varid{f}\;\Conid{Int}\Rightarrow \Conid{Rec}\;\Varid{f}\to \Conid{Int}}$\\
+${\Varid{evalInt}\;(\Conid{In}\;\Varid{e})\mathrel{=}\Varid{\phi}\;(\Varid{\Conid{ThirdTryPlus}.map}\;\Varid{eval}\;\Varid{e})}$
+\end{tabbing}
+\section{Usage}
+
+This file is a template for transforming literate script into \LaTeX
+and is not actually a \texttt{Haskell} interpreter implementation.
+Each section in this file is a separate module that can be loaded
+individually for experimentation.
+
+
+Note that the interpreters have been developed under GHC and some
+require turning on the Glasgow Extensions.  Your mileage may vary if
+you're using HUGS.
+
+To build a \LaTeX document from the interpreter files, use:
+
+\begin{alltt}
+   lhs2TeX --math Duponcheel.lhs > Duponcheel.tex
+\end{alltt}
+
+and run \LaTeX on the result.  The individual interpreters cannot be
+transformed to \LaTeX directly.
+
+\end{document}

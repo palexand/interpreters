@@ -1,0 +1,1676 @@
+\documentclass[10pt]{article}
+
+%% ODER: format ==         = "\mathrel{==}"
+%% ODER: format /=         = "\neq "
+\makeatletter
+
+\usepackage{amstext}
+\usepackage{amssymb}
+\usepackage{stmaryrd}
+\DeclareFontFamily{OT1}{cmtex}{}
+\DeclareFontShape{OT1}{cmtex}{m}{n}
+  {<5><6><7><8>cmtex8
+   <9>cmtex9
+   <10><10.95><12><14.4><17.28><20.74><24.88>cmtex10}{}
+\DeclareFontShape{OT1}{cmtex}{m}{it}
+  {<-> ssub * cmtt/m/it}{}
+\newcommand{\texfamily}{\fontfamily{cmtex}\selectfont}
+\DeclareFontShape{OT1}{cmtt}{bx}{n}
+  {<5><6><7><8>cmtt8
+   <9>cmbtt9
+   <10><10.95><12><14.4><17.28><20.74><24.88>cmbtt10}{}
+\DeclareFontShape{OT1}{cmtex}{bx}{n}
+  {<-> ssub * cmtt/bx/n}{}
+\newcommand{\tex}[1]{\text{\texfamily#1}}	% NEU
+
+\newcommand{\Sp}{\hskip.33334em\relax}
+
+\newlength{\lwidth}\setlength{\lwidth}{4.5cm}
+\newlength{\cwidth}\setlength{\cwidth}{8mm} % 3mm
+
+\newcommand{\Conid}[1]{\mathit{#1}}
+\newcommand{\Varid}[1]{\mathit{#1}}
+\newcommand{\anonymous}{\kern0.06em \vbox{\hrule\@width.5em}}
+\newcommand{\plus}{\mathbin{+\!\!\!+}}
+\newcommand{\bind}{\mathbin{>\!\!\!>\mkern-6.7mu=}}
+\newcommand{\sequ}{\mathbin{>\!\!\!>}}
+\renewcommand{\leq}{\leqslant}
+\renewcommand{\geq}{\geqslant}
+\newcommand{\NB}{\textbf{NB}}
+\newcommand{\Todo}[1]{$\langle$\textbf{To do:}~#1$\rangle$}
+
+\makeatother
+
+\usepackage{fullpage}
+\usepackage{alltt}
+
+\bibliographystyle{plain}
+
+\parskip=\medskipamount
+\parindent=0pt
+
+\title{The InterpreterLib Explicit Algebra Package}
+\author{\emph{Uk'taad B'mal} \\
+  The University of Kansas - ITTC \\
+  2335 Irving Hill Rd, Lawrence, KS 66045 \\
+  \texttt{lambda@ittc.ku.edu}}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+
+The use of \emph{composable interpreters} has proven to be useful in
+the development of language parsers in our group.  However, some
+aspects of techniques used in papers from the literature do not scale
+well to larger projects.  More specifically, using polymorphism to
+select \ensuremath{\Varid{\phi}} as is done in the \ensuremath{\Conid{LangUtils}} library will not work when
+multiple interpreters exist in the same environment.  Furthermore,
+having instances of \ensuremath{\Conid{Algebra}} be opaque causes serious problems when
+we start looking at composing algebras.
+
+\end{abstract}
+
+\section{Introduction}
+
+The \ensuremath{\Conid{InterpreterLib}} libraries are a collection of support packages
+for writing \emph{composable interpreters} using \emph{explicit
+  algebras}.  The term composable describes interpreters that are
+composed of modules defining interpreters for language components.
+Instead of writing a monolithic interpreter, we write individual
+components and assemble those components as needed for a specific
+language.  The literature describes several approaches for writing
+composable
+interpreters~\cite{Liang:96:Modular-Denotat,Espinosa:95:Semantic-Lego,Duponcheel::Using-catamorph,Jones:93:Composing-Monad,Steele:94:Building-interp}.
+All of them share the construction and integration of interpreter
+components.\footnote{The Lambda Group and SLDG lab have reports
+  documenting the Hutton and Duponcheel approaches as well as example
+  interpreters.  The \ensuremath{\Conid{LangUtils}} module is also worth looking at for
+  other examples.}
+
+The approach we take in our interpreters is writing \emph{functors}
+and \emph{semantic algebras}.  A functor is simply a specialized fold
+for a language construct.  Recall that fold is a mechanism for
+recursively applying a function to a composite data structure and
+accumulating results.  Functors for language elements ``push''
+functions into language constructs.  Each functor defines a function,
+\ensuremath{\Varid{fmap}}, that performs this function.  For example, \ensuremath{\Varid{fmap}} over an \ensuremath{\mathbf{if}}
+construct might have the following definition:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{fmap}\;\Varid{g}\;(\Conid{IfExpr}\;\Varid{c}\;\Varid{t}\;\Varid{f})\mathrel{=}(\Conid{IfExpr}\;(\Varid{g}\;\Varid{c})\;(\Varid{g}\;\Varid{t})\;(\Varid{g}\;\Varid{f}))}$
+\end{tabbing}
+Thus, if we wanted to apply an interpretation function or some
+transformation function to a specific \ensuremath{\Conid{IfExpr}} we simply call \ensuremath{\Varid{fmap}\;\Varid{fun}}
+on the expression.  If we define a functor for each language
+construct, we can fold a function into any term we might write.
+
+A semantic algebra does exactly what its name implies by defining a
+semantics for each language construct.  Algebras for language elements
+define how they are evaluated.  Each algebra defines a function,
+traditionally called \ensuremath{\Varid{\phi}}, that maps its associated language construct
+to a value.  Using \ensuremath{\Varid{fmap}} to fold \ensuremath{\Varid{\phi}} onto a composite language
+structure implements an interpreter for the language.\footnote{In the
+  \ensuremath{\Conid{InterpreterLib}} modules, we use explicit algebras where \ensuremath{\Varid{\phi}} is
+  replaced by \ensuremath{\Varid{apply}}, but the principle is similar.}
+For example, \ensuremath{\Varid{\phi}} for an \ensuremath{\mathbf{if}} construct might have the following
+definition:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{\phi}\;(\Conid{IFExpr}\;\Varid{c}\;\Varid{t}\;\Varid{f})\mathrel{=}\mathbf{do}\;\{\mskip1.5mu \Varid{c'}\leftarrow \Varid{c}}$\\
+${\phantom{\Varid{\phi}\;(\Conid{IFExpr}\;\Varid{c}\;\Varid{t}\;\Varid{f})\mathrel{=}\mathbf{do}\;\mbox{}};\Varid{return}\mathbin{\$}\mathbf{if}\;\Varid{c'}\equiv \Conid{ETrue}\;\mathbf{then}\;\Varid{t}\;\mathbf{else}\;\Varid{f}}$\\
+${\phantom{\Varid{\phi}\;(\Conid{IFExpr}\;\Varid{c}\;\Varid{t}\;\Varid{f})\mathrel{=}\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$
+\end{tabbing}
+The general idea is that we can write new semantic algebras and reuse
+functors to quickly generate new interpreters.  What \ensuremath{\Conid{InterpreterLib}}
+does that \ensuremath{\Conid{LangUtils}} does not is provides a way to explicitly specify
+the algebra used by an interpreter.  Further, the algebra structure
+defined is a \texttt{Haskell} data structure that can be manipulated
+like any other structure.  Thus, defining traditional functors between
+algebras as well as algebra combinators is now possible.
+
+\section{Functors}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mbox{\enskip\{-\# OPTIONS -fglasgow-exts -fallow-overlapping-instances -fallow-undecidable-instances -fno-monomorphism-restriction  \#-\}\enskip}}$\\
+${\mathbf{module}\;\Conid{\Conid{InterpreterLib}.Functors}\;\mathbf{where}}$\\
+${\mathbf{infixr}\;\mathrm{5}\mathbin{:\$:}}$
+\end{tabbing}
+Define the standard fixed point for types.  The constructor \ensuremath{\Conid{In}} is
+necessary to keep Haskell happy during type checking.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{newtype}\;\Conid{Fix}\;\Varid{f}\mathrel{=}\Conid{In}\;(\Varid{f}\;(\Conid{Fix}\;\Varid{f}))}$\\
+${\Varid{inn}\mathrel{=}\Conid{In}}$\\
+${\Varid{out}\;(\Conid{In}\;\Varid{x})\mathrel{=}\Varid{x}}$
+\end{tabbing}
+Define the standard \ensuremath{\Conid{Sum}} type by encapsulating \ensuremath{\Conid{Either}}.  Again, \ensuremath{\Conid{S}}
+is around to keep Haskell happy during type checking.  Note the
+definition of an infix constructor alias.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{newtype}\;\Conid{Sum}\;\Varid{f}\;\Varid{g}\;\Varid{x}\mathrel{=}\Conid{S}\;(\Conid{Either}\;(\Varid{f}\;\Varid{x})\;(\Varid{g}\;\Varid{x}))}$\\
+${\Varid{unS}\;(\Conid{S}\;\Varid{x})\mathrel{=}\Varid{x}}$\\
+${\mathbf{type}\;\Varid{x}\mathbin{:\$:}\Varid{y}\mathrel{=}\Conid{Sum}\;\Varid{x}\;\Varid{y}}$
+\end{tabbing}
+Define a sum of functors to be a functor by defining fmap
+appropriately.  If we have two functors, a new functor can be defined
+from the \ensuremath{\Conid{Sum}} by using \ensuremath{\Conid{Left}} and \ensuremath{\Conid{Right}} to guide the application of
+\ensuremath{\Varid{fmap}}.  Not much to it really, just stripping away the constructor,
+applying the \ensuremath{\Varid{fmap}} to the carried data, and putting the constructor
+back together.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{instance}\;(\Conid{Functor}\;\Varid{f},\Conid{Functor}\;\Varid{g})\Rightarrow \Conid{Functor}\;(\Conid{Sum}\;\Varid{f}\;\Varid{g})}$\\
+${\hskip0.50em\relax\mathbf{where}\;\Varid{fmap}\;\Varid{h}\;(\Conid{S}\;(\Conid{Left}\;\Varid{x}))\mathrel{=}\Conid{S}\;(\Conid{Left}\mathbin{\$}\Varid{fmap}\;\Varid{h}\;\Varid{x})}$\\
+${\hskip0.50em\relax\phantom{\mathbf{where}\;\mbox{}}\Varid{fmap}\;\Varid{h}\;(\Conid{S}\;(\Conid{Right}\;\Varid{x}))\mathrel{=}\Conid{S}\;(\Conid{Right}\mathbin{\$}\Varid{fmap}\;\Varid{h}\;\Varid{x})}$
+\end{tabbing}
+Define \ensuremath{\Conid{SubFunctor}} in a manner very similar to the way \ensuremath{\Conid{SubSum}}.
+\ensuremath{\Varid{injF}} injects the subfunctor into its super functor.  \ensuremath{\Varid{prjF}} does the
+opposite if it can.  Note the use of the \ensuremath{\Conid{Maybe}} type.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{class}\;\Conid{SubFunctor}\;\Varid{f}\;\Varid{g}\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{injF}\mathbin{::}\Varid{f}\;\Varid{x}\to \Varid{g}\;\Varid{x}}$\\
+${\hskip2.00em\relax\Varid{prjF}\mathbin{::}\Varid{g}\;\Varid{x}\to \Conid{Maybe}\;(\Varid{f}\;\Varid{x})}$
+\end{tabbing}
+An \ensuremath{\Conid{Functor}} is a \ensuremath{\Conid{SubFunctor}} of itself.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{instance}\;\Conid{SubFunctor}\;\Varid{f}\;\Varid{f}\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{injF}\;\Varid{f}\mathrel{=}\Varid{f}}$\\
+${\hskip2.00em\relax\Varid{prjF}\mathrel{=}\Conid{Just}}$
+\end{tabbing}
+Any \ensuremath{\Conid{Functor}} is a \ensuremath{\Conid{SubFunctor}} of a \ensuremath{\Conid{Sum}} that includes it as the
+left side of the pair.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{instance}\;\Conid{SubFunctor}\;\Varid{f}\;(\Conid{Sum}\;\Varid{f}\;\Varid{x})\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{injF}\mathrel{=}\Conid{S}\mathbin{\circ}\Conid{Left}}$\\
+${\hskip2.00em\relax\Varid{prjF}\;(\Conid{S}\;(\Conid{Left}\;\Varid{f}))\mathrel{=}\Conid{Just}\;\Varid{f}}$\\
+${\hskip2.00em\relax\Varid{prjF}\;(\Conid{S}\;(\Conid{Right}\;\Varid{x}))\mathrel{=}\Conid{Nothing}}$
+\end{tabbing}
+If \ensuremath{\Varid{f}} is a \ensuremath{\Conid{SubFunctor}} of \ensuremath{\Varid{g}}, then it is also a \ensuremath{\Conid{SubFunctor}} of the
+\ensuremath{\Conid{Sum}} of any \ensuremath{\Varid{x}} and \ensuremath{\Varid{g}}.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{instance}\;(\Conid{SubFunctor}\;\Varid{f}\;\Varid{g})\Rightarrow \Conid{SubFunctor}\;\Varid{f}\;(\Conid{Sum}\;\Varid{x}\;\Varid{g})\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Varid{injF}\mathrel{=}\Conid{S}\mathbin{\circ}\Conid{Right}\mathbin{\circ}\Varid{injF}}$\\
+${\hskip2.00em\relax\Varid{prjF}\;(\Conid{S}\;(\Conid{Left}\;\Varid{x}))\mathrel{=}\Conid{Nothing}}$\\
+${\hskip2.00em\relax\Varid{prjF}\;(\Conid{S}\;(\Conid{Right}\;\Varid{b}))\mathrel{=}\Varid{prjF}\;\Varid{b}}$
+\end{tabbing}
+Remaining functions seem to be helper functions of various kinds.
+\ensuremath{\Varid{toS}} seems to inject a term defined over a fixed point into a fixed
+point.  The various \ensuremath{\Varid{mkTerm}} functions are used to create terms of
+various arities.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{toS}\mathbin{::}(\Conid{SubFunctor}\;\Varid{f}\;\Varid{g},\Conid{Functor}\;\Varid{g})\Rightarrow \Varid{f}\;(\Conid{Fix}\;\Varid{g})\to \Conid{Fix}\;\Varid{g}}$\\
+${\Varid{toS}\;\Varid{x}\mathrel{=}\Varid{inn}\mathbin{\$}\Varid{injF}\;\Varid{x}}$\\
+${}$\\
+${\Varid{mkTerm0}\mathrel{=}\Varid{toS}}$\\
+${\Varid{mkTerm}\;\Varid{f}\mathrel{=}\Varid{toS}\mathbin{\circ}\Varid{f}}$\\
+${\Varid{mkTerm2}\;\Varid{f}\mathrel{=}\Varid{curry}\mathbin{\$}\Varid{toS}\mathbin{\circ}(\Varid{uncurry}\;\Varid{f})}$\\
+${\Varid{mkTerm3}\;\Varid{f}\mathrel{=}\Varid{curry}\mathbin{\$}\Varid{curry}\mathbin{\$}\Varid{toS}\mathbin{\circ}(\Varid{uncurry}\;(\Varid{uncurry}\;\Varid{f}))}$
+\end{tabbing}
+\ensuremath{\Conid{ZipFunctor}} provides a function that performs the standard \ensuremath{\Conid{Functor}}
+operation, but over two inputs rather than one.  Remember that Functor
+takes a function, \ensuremath{(\Varid{a}\to \Varid{b})}, and a term defined using a parameterized
+type, \ensuremath{\Varid{f}\;\Varid{a}}, and changes the term to use the carrier set \ensuremath{\Varid{b}} rather
+than \ensuremath{\Varid{a}}.  \ensuremath{\Conid{ZipFunctor}} does the same thing, but the input langauge
+parameterized over two types.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{class}\;\Conid{ZipFunctor}\;\Varid{f}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\mathbin{::}\Conid{Monad}\;\Varid{m}\Rightarrow (\Varid{a}\to \Varid{b}\to \Varid{c})\to \Varid{f}\;\Varid{a}\to \Varid{f}\;\Varid{b}\to \Varid{m}\;(\Varid{f}\;\Varid{c})}$
+\end{tabbing}
+\section{Algebras}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mbox{\enskip\{-\# OPTIONS -fglasgow-exts -fno-monomorphism-restriction  \#-\}\enskip}}$\\
+${\mathbf{module}\;\Conid{\Conid{InterpreterLib}.Algebras}\;\mathbf{where}}$\\
+${}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Functors}}$\\
+${\mathbf{import}\;\Conid{Monad}\;(\Varid{liftM},\Varid{liftM2})}$\\
+${\mathbf{import}\;\Conid{List}\;((\mathbin{\char92 \char92 }))}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.SubType}}$\\
+${}$\\
+${\mathbf{infixr}\;\mathrm{5}\mathbin{@+@}}$
+\end{tabbing}
+
+One of the problems that we have with algebras in Duponcheel's and
+Gayo's work is that they are overloaded functions, meaning only one
+algebra is possible for a given functor/value space pair without
+giving us overlapping instances. It would be nice to be able to pass
+the algebra as a first class value, as well as do things like algebra
+extension, where one algebra extends the other.
+
+Essentially an algebra is a parameterized function with a type \ensuremath{\Conid{F}\;\Varid{a}\to \Varid{a}} for a given functor \ensuremath{\Conid{F}} and a \emph{carrier set} \ensuremath{\Varid{a}}. There are
+some Haskell reasons we want to make the actual type of algebras
+abstract, instead just \ensuremath{\mathbf{type}\;\Conid{AType}\;\Varid{f}\;\Varid{a}\mathrel{=}\Varid{f}\;\Varid{a}\to \Varid{a}}, because we may
+want to manipulate algebras when combining two of them, and functions
+are opaque. A more transparent form, such as the record format we use
+below, gives us more flexibility for doing these
+manipulations. Unfortunately, we have to have the functional
+dependency \ensuremath{\Varid{f}\to \Varid{alg}} ("the term type \ensuremath{\Varid{f}} uniquely determines the
+algebra representation \ensuremath{\Varid{alg}}"). Note that this means the algebra
+representation - the packaging around the function \ensuremath{\Varid{f}\;\Varid{a}\to \Varid{a}}, and not
+the actual function itself is uniquely. The problem with this is that
+we can't just combine two different algebra representations or even
+have them visible in the same namespace. One research question is how
+to combine heterogeneous algebra representations. One possibility is
+to use the \ensuremath{\Conid{Arrows}} abstraction of John Hughes.
+
+6/12 - updated functional dependencies so that the dependency is
+reflexive, allowing the pairAlg stuff to work.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{type}\;\Conid{AlgSig}\;\Varid{f}\;\Varid{a}\mathrel{=}\Varid{f}\;\Varid{a}\to \Varid{a}}$
+\end{tabbing}
+Define a different \ensuremath{\Conid{Algebra}} than that used in standard approaches.
+This \ensuremath{\Conid{Algebra}} is parameterized over the traditional carrier set and
+an algebra structure.  The algebra structure is the data type that
+provides definitions for the \ensuremath{\Conid{Algebra}}.  Functional dependencies state
+that f can be uniquely determined from alg.  As is typical, for something to be and \ensuremath{\Conid{Algebra}} it must also be a \ensuremath{\Conid{Functor}}.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{class}\;\Conid{Functor}\;\Varid{f}\Rightarrow \Conid{Algebra}\;\Varid{f}\;\Varid{alg}\;\Varid{a}\mid \Varid{alg}\to \Varid{f}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{apply}\mathbin{::}\Varid{alg}\;\Varid{a}\to \Varid{f}\;\Varid{a}\to \Varid{a}}$
+\end{tabbing}
+Algebra builder seems to define a mechanism for transforming some type
+into an algebra.  I'm guessing this is for defining standard algebra
+formers
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{class}\;\Conid{Algebra}\;\Varid{f}\;\Varid{alg}\;\Varid{a}\Rightarrow \Conid{AlgebraBuilder}\;\Varid{f}\;\Varid{fType}\;\Varid{alg}\;\Varid{a}\mid \Varid{fType}\to \Varid{f},\Varid{fType}\to \Varid{a},\Varid{fType}\to \Varid{alg}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{mkAlgebra}\mathbin{::}\Varid{fType}\to (\Varid{alg}\;\Varid{a})}$
+\end{tabbing}
+Parameterize \ensuremath{\Varid{cata}} over \ensuremath{\Conid{Algebra}}.  Nice.  \ensuremath{(\Varid{apply}\;\Varid{alg})} effectively
+produces the function \ensuremath{\Varid{\phi}} from the \ensuremath{\Varid{alg}} structure.  Remember, \ensuremath{\Varid{alg}}
+is an algebra structure that contains functions defined for an
+\ensuremath{\Conid{Algebra}}.  When used in this manner with \ensuremath{\Varid{apply}}, the appropriate
+function is extracted from the algebra and applied.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{cata}\;\Varid{alg}\mathrel{=}(\Varid{apply}\;\Varid{alg})\mathbin{\circ}(\Varid{fmap}\;(\Varid{cata}\;\Varid{alg}))\mathbin{\circ}\Varid{out}}$
+\end{tabbing}
+\ensuremath{\Varid{pairAlg}} is a mechanism for pairing algebras.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{pairAlg}\;\Varid{a1}\;\Varid{a2}\mathrel{=}\Varid{mkAlgebra}\;\Varid{pa}}$\\
+${\hskip1.00em\relax\mathbf{where}\;\Varid{pa}\;\Varid{term}\mathrel{=}(((\Varid{apply}\;\Varid{a1})\mathbin{\circ}(\Varid{fmap}\;\Varid{fst}))\;\Varid{term},((\Varid{apply}\;\Varid{a2})\mathbin{\circ}(\Varid{fmap}\;\Varid{snd}))\;\Varid{term})}$
+\end{tabbing}
+Define sums of algebras in the same manner as sums of terms.  Note
+that the same functions are defined, but with different argument
+types.  The first definition seems to be a spurrious example and
+should be ignored for the time being.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{sumAlg}\;\Varid{a1}\;\Varid{a2}\mathrel{=}\Conid{SumAlgebra}\{\mskip1.5mu \Varid{left}\mathrel{=}\Varid{sumAlg'},}$\\
+${\phantom{\Varid{sumAlg}\;\Varid{a1}\;\Varid{a2}\mathrel{=}\Conid{SumAlgebra}\{\mskip1.5mu \mbox{}}\Varid{right}\mathrel{=}\Varid{sumAlg'}\mskip1.5mu\}}$\\
+${\hskip1.00em\relax\mathbf{where}\;\Varid{sumAlg'}\;(\Conid{S}\;(\Conid{Left}\;\Varid{x}))\mathrel{=}\Varid{apply}\;\Varid{a1}\;\Varid{x}}$\\
+${\hskip1.00em\relax\phantom{\mathbf{where}\;\mbox{}}\Varid{sumAlg'}\;(\Conid{S}\;(\Conid{Right}\;\Varid{x}))\mathrel{=}\Varid{apply}\;\Varid{a2}\;\Varid{x}}$\\
+${}$\\
+${(\mathbin{@+@})\mathrel{=}\Varid{sumAlg}}$\\
+${}$\\
+${\mathbf{data}\;\Conid{SumAlgebra}\;\Varid{f}\;\Varid{g}\;\Varid{a}\mathrel{=}\Conid{SumAlgebra}\{\mskip1.5mu \Varid{left}\mathbin{::}\Conid{Sum}\;\Varid{f}\;\Varid{g}\;\Varid{a}\to \Varid{a},}$\\
+${\phantom{\mathbf{data}\;\Conid{SumAlgebra}\;\Varid{f}\;\Varid{g}\;\Varid{a}\mathrel{=}\Conid{SumAlgebra}\{\mskip1.5mu \mbox{}}\Varid{right}\mathbin{::}\Conid{Sum}\;\Varid{f}\;\Varid{g}\;\Varid{a}\to \Varid{a}\mskip1.5mu\}}$\\
+${}$\\
+${}$\\
+${\mathbf{instance}\;(\Conid{Functor}\;\Varid{f},\Conid{Functor}\;\Varid{g})\Rightarrow \Conid{Algebra}\;(\Conid{Sum}\;\Varid{f}\;\Varid{g})\;(\Conid{SumAlgebra}\;\Varid{f}\;\Varid{g})\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{S}\;(\Conid{Left}\;\anonymous ))\mathrel{=}\Varid{left}\;\Varid{alg}\;\Varid{t}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{S}\;(\Conid{Right}\;\anonymous ))\mathrel{=}\Varid{right}\;\Varid{alg}\;\Varid{t}}$\\
+${}$\\
+${}$\\
+${\mathbf{instance}\;(\Conid{Functor}\;\Varid{f},\Conid{Functor}\;\Varid{g})\Rightarrow }$\\
+${\hskip1.00em\relax\Conid{AlgebraBuilder}\;(\Conid{Sum}\;\Varid{f}\;\Varid{g})\;(\Conid{Sum}\;\Varid{f}\;\Varid{g}\;\Varid{a}\to \Varid{a})\;(\Conid{SumAlgebra}\;\Varid{f}\;\Varid{g})\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{mkAlgebra}\;\Varid{f}\mathrel{=}\Conid{SumAlgebra}\;\Varid{f}\;\Varid{f}}$
+\end{tabbing}
+%%\section{SubType}
+%% %include SubType.lhs
+
+\section{Modules}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{module}\;\Conid{\Conid{InterpreterLib}.Modules}\;\mathbf{where}}$\\
+${}$\\
+${\mathbf{class}\;\Conid{Module}\;\Varid{mod}\;\Varid{opened}\mid \Varid{mod}\to \Varid{opened}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{open}\mathbin{::}\Varid{mod}\to \Varid{opened}}$
+\end{tabbing}
+\section{Sample Interpreter}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mbox{\enskip\{-\# OPTIONS -fglasgow-exts -fno-monomorphism-restriction  \#-\}\enskip}}$\\
+${\hskip1.00em\relax\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Algebras}}$\\
+${\hskip1.00em\relax\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Functors}}$\\
+${\hskip1.00em\relax\mathbf{import}\;\Conid{\Conid{InterpreterLib}.SubType}}$\\
+${\hskip1.00em\relax\mathbf{import}\;\Conid{Monad}}$\\
+${\hskip1.00em\relax\mathbf{import}\;\Conid{\Conid{Control}.\Conid{Monad}.Reader}}$
+\end{tabbing}
+\section{Example Language}
+
+To demonstrate the use of these language definition features, we will
+define an interpreter for an \ensuremath{\Conid{Integer}} language that implements simple
+mathematical operations.  We start by defining a type for the
+interpreter's value space:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{data}\;\Conid{Value}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\mathrel{=}\Conid{ValNum}\;\Conid{Int}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\mid \Conid{ValLambda}\;(\Conid{ValueMonad}\to \Conid{ValueMonad})}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Show}\;\Conid{Value}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{show}\;(\Conid{ValNum}\;\Varid{x})\mathrel{=}\Varid{show}\;\Varid{x}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{show}\;(\Conid{ValLambda}\;\anonymous )\mathrel{=}\text{\tt \char34 <Function~Value>\char34}}$
+\end{tabbing}
+This definition is unchanged from other interpreters where we want the
+value space defined separately from the language itself.  The \ensuremath{\Conid{Value}}
+type is made an instance of \ensuremath{\Conid{Show}} to allow printing of interpreter
+results.
+
+Next, we define types for each of the language's AST elements.  We
+start with the definition for integer constants:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{data}\;\Conid{AlgConst}\;\Varid{t}\mathrel{=}\Conid{AlgC}\;((\Conid{ExprConst}\;\Varid{t})\to \Varid{t})}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{data}\;\Conid{ExprConst}\;\Varid{e}\mathrel{=}\Conid{EConst}\;\Conid{Int}}$\\
+${\hskip1.00em\relax\phantom{\mathbf{data}\;\Conid{ExprConst}\;\Varid{e}\mathrel{=}\mbox{}}\mathbf{deriving}\;(\Conid{Show},\Conid{Eq})}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Functor}\;\Conid{ExprConst}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{EConst}\;\Varid{x})\mathrel{=}\Conid{EConst}\;\Varid{x}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Algebra}\;\Conid{ExprConst}\;\Conid{AlgConst}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{apply}\;(\Conid{AlgC}\;\Varid{f})\;\Varid{x}\mathord{@}(\Conid{EConst}\;\anonymous )\mathrel{=}(\Varid{f}\;\Varid{x})}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{mkEConst}\mathrel{=}\Varid{inn}\mathbin{\circ}\Varid{sleft}\mathbin{\circ}\Conid{EConst}}$
+\end{tabbing}
+For each AST element we define 5 elements: (i) the \ensuremath{\Conid{Algebra}} data
+type; (ii) the \ensuremath{\Conid{Term}} data type; (iii) the \ensuremath{\Conid{Functor}} instance; (iv)
+the \ensuremath{\Conid{Algebra}} instance; and (v) a helper function to create terms.
+The \ensuremath{\Conid{Term}} data structure and \ensuremath{\Conid{Functor}} instance remain unchanged
+from previous modular interpreters.  The \ensuremath{\Conid{Term}} structure defines a
+non-recursive type for representing terms while the \ensuremath{\Conid{Functor}} defines
+a mechanism for folding operations onto the term structure.  These
+definitions remain unchanged from previous modular interpreters.
+
+The algebra function does not change from previous interpreters.  It
+continues to provide a mapping from a term to a value.  The
+distinction is the \ensuremath{\Conid{Algebra}} type requires three parameters - the
+carrier set and the term type as before, plus the algebra structure
+used for evaluation.  Note that the algebra is the instance of
+\ensuremath{\Conid{Algebra}} while the algebra structure provides the definitions used by
+the algebra.
+
+The \ensuremath{\Varid{apply}} function defined for all \ensuremath{\Conid{Algebra}} instances takes the
+place of \ensuremath{\Varid{\phi}}.  It extracts what was \ensuremath{\Varid{\phi}} from the algebra structure
+and applies it.  Thus, \ensuremath{\Varid{apply}\;\Varid{alg}\;\Varid{t}} applies the interpretation
+function from \ensuremath{\Varid{alg}} to the term \ensuremath{\Varid{t}}.  In affect, \ensuremath{\Varid{\phi}\mathrel{=}(\Varid{apply}\;\Varid{alg})}.
+One important difference should be noted.  Frequently, \ensuremath{\Varid{\phi}} used
+parameter matching to pull apart an argument and process its parts.
+\ensuremath{\Varid{apply}} is virtually always called with the argument intact.
+
+As an example, let's step through this definition.  \ensuremath{\Conid{AlgConst}} is the
+algebra structure defining interpretation of constants.  It's only
+parameter is a function that maps \ensuremath{\Conid{ExperConst}} instances over some
+carrier set, \ensuremath{\Varid{t}} to \ensuremath{\Varid{t}}.  This is precisely the signature of \ensuremath{\Varid{\phi}}.
+However, instead of using polymorphism to find \ensuremath{\Varid{\phi}}, we'll get it
+directly from the algebra when we invoke the catamorphism.
+
+\ensuremath{\Conid{ExprConst}} is the datatype associated with constants and is an
+instance of \ensuremath{\Conid{Functor}}.  \ensuremath{\Conid{ExprConst}} is an instance of \ensuremath{\Conid{Functor}} and
+\ensuremath{\Varid{fmap}} is defined in the canonical fashion to simply return the
+constant it is passed.
+
+\ensuremath{\Conid{ExprConst}} is also an instance of \ensuremath{\Conid{Algebra}}.  Here, the definition is
+different because \ensuremath{\Varid{apply}} takes two arguments - an algebra structure
+and a term - rather than one as it did in earlier implementations.  In
+this case, \ensuremath{\Varid{apply}} first extracts the interpretation function, \ensuremath{\Varid{f}},
+from the algebra structure.  It then makes sure the term argument is
+the correct type and associates it with \ensuremath{\Varid{x}}. With the evaluation
+function and the term available, \ensuremath{\Varid{apply}} simply calls the
+evaluation function on the term.
+
+The \ensuremath{\Varid{mkEConst}} function is a helper function that constructs a
+complete \ensuremath{\Conid{ExprConstant}} term.  Defining terms is a real pain with all
+of the \ensuremath{\Conid{Sum}} and \ensuremath{\Conid{Fix}} cruft floating around.  I suspect that these
+helper functions will need to be rewritten whenever the language
+changes due to the structure of the \ensuremath{\Conid{Sum}}.  There may be a way around
+this similar to the techniques used in earlier languages.
+
+The addition and multiplication terms are defined similarly:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{data}\;\Conid{AlgAdd}\;\Varid{t}\mathrel{=}\Conid{AlgAdd}\{\mskip1.5mu \Varid{add}\mathbin{::}(\Conid{ExprAdd}\;\Varid{t})\to \Varid{t},}$\\
+${\hskip1.00em\relax\phantom{\mathbf{data}\;\Conid{AlgAdd}\;\Varid{t}\mathrel{=}\Conid{AlgAdd}\{\mskip1.5mu \mbox{}}\Varid{sub}\mathbin{::}(\Conid{ExprAdd}\;\Varid{t})\to \Varid{t}\mskip1.5mu\}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{data}\;\Conid{ExprAdd}\;\Varid{e}\mathrel{=}\Conid{EAdd}\;\Varid{e}\;\Varid{e}}$\\
+${\hskip1.00em\relax\phantom{\mathbf{data}\;\Conid{ExprAdd}\;\Varid{e}\mbox{}}\mid \Conid{ESub}\;\Varid{e}\;\Varid{e}}$\\
+${\hskip1.00em\relax\phantom{\mathbf{data}\;\Conid{ExprAdd}\;\Varid{e}\mbox{}}\phantom{\mid \mbox{}}\mathbf{deriving}\;(\Conid{Show},\Conid{Eq})}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Functor}\;\Conid{ExprAdd}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{EAdd}\;\Varid{x}\;\Varid{y})\mathrel{=}(\Conid{EAdd}\;(\Varid{f}\;\Varid{x})\;(\Varid{f}\;\Varid{y}))}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{ESub}\;\Varid{x}\;\Varid{y})\mathrel{=}(\Conid{ESub}\;(\Varid{f}\;\Varid{x})\;(\Varid{f}\;\Varid{y}))}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Algebra}\;\Conid{ExprAdd}\;\Conid{AlgAdd}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{x}\mathord{@}(\Conid{EAdd}\;\anonymous \;\anonymous )\mathrel{=}(\Varid{add}\;\Varid{alg}\;\Varid{x})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{x}\mathord{@}(\Conid{ESub}\;\anonymous \;\anonymous )\mathrel{=}(\Varid{sub}\;\Varid{alg}\;\Varid{x})}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{mkEAdd}\;\Varid{x}\;\Varid{y}\mathrel{=}\Varid{inn}\mathbin{\$}\Varid{sright}\mathbin{\$}\Varid{sleft}\mathbin{\$}\Conid{EAdd}\;\Varid{x}\;\Varid{y}}$\\
+${\hskip1.00em\relax\Varid{mkESub}\;\Varid{x}\;\Varid{y}\mathrel{=}\Varid{inn}\mathbin{\$}\Varid{sright}\mathbin{\$}\Varid{sleft}\mathbin{\$}\Conid{ESub}\;\Varid{x}\;\Varid{y}}$
+\end{tabbing}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{data}\;\Conid{AlgMult}\;\Varid{t}\mathrel{=}\Conid{AlgMult}\{\mskip1.5mu \Varid{mult}\mathbin{::}(\Conid{ExprMult}\;\Varid{t})\to \Varid{t},}$\\
+${\hskip1.00em\relax\phantom{\mathbf{data}\;\Conid{AlgMult}\;\Varid{t}\mathrel{=}\Conid{AlgMult}\{\mskip1.5mu \mbox{}}\Varid{divi}\mathbin{::}(\Conid{ExprMult}\;\Varid{t})\to \Varid{t}\mskip1.5mu\}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{data}\;\Conid{ExprMult}\;\Varid{e}\mathrel{=}\Conid{EMult}\;\Varid{e}\;\Varid{e}}$\\
+${\hskip1.00em\relax\phantom{\mathbf{data}\;\Conid{ExprMult}\;\Varid{e}\mbox{}}\mid \Conid{EDiv}\;\Varid{e}\;\Varid{e}}$\\
+${\hskip1.00em\relax\phantom{\mathbf{data}\;\Conid{ExprMult}\;\Varid{e}\mbox{}}\phantom{\mid \mbox{}}\mathbf{deriving}\;(\Conid{Show},\Conid{Eq})}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Functor}\;\Conid{ExprMult}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{EMult}\;\Varid{x}\;\Varid{y})\mathrel{=}(\Conid{EMult}\;(\Varid{f}\;\Varid{x})\;(\Varid{f}\;\Varid{y}))}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{EDiv}\;\Varid{x}\;\Varid{y})\mathrel{=}(\Conid{EDiv}\;(\Varid{f}\;\Varid{x})\;(\Varid{f}\;\Varid{y}))}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Algebra}\;\Conid{ExprMult}\;\Conid{AlgMult}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{x}\mathord{@}(\Conid{EMult}\;\anonymous \;\anonymous )\mathrel{=}(\Varid{mult}\;\Varid{alg}\;\Varid{x})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{x}\mathord{@}(\Conid{EDiv}\;\anonymous \;\anonymous )\mathrel{=}(\Varid{divi}\;\Varid{alg}\;\Varid{x})}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{mkEMult}\;\Varid{x}\;\Varid{y}\mathrel{=}\Varid{inn}\mathbin{\$}\Varid{sright}\mathbin{\$}\Varid{sright}\mathbin{\$}\Varid{sleft}\mathbin{\$}\Conid{EMult}\;\Varid{x}\;\Varid{y}}$\\
+${\hskip1.00em\relax\Varid{mkEDiv}\;\Varid{x}\;\Varid{y}\mathrel{=}\Varid{inn}\mathbin{\$}\Varid{sright}\mathbin{\$}\Varid{sright}\mathbin{\$}\Varid{sleft}\mathbin{\$}\Conid{EDiv}\;\Varid{x}\;\Varid{y}}$
+\end{tabbing}
+At this point we have elements of a simple language for arithmetic
+with no variables or functions.  We can add lambdas, applications and
+variables using techniques similar to those from earlier interpreters:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{data}\;\Conid{ExprFun}\;\Varid{t}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\mathrel{=}\Conid{ELambda}\;\Conid{String}\;\Conid{TyValue}\;\Varid{t}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\mid \Conid{EApp}\;\Varid{t}\;\Varid{t}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\mid \Conid{EVar}\;\Conid{String}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mid \mbox{}}\mathbf{deriving}\;(\Conid{Show},\Conid{Eq})}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{data}\;\Conid{AlgFun}\;\Varid{t}\mathrel{=}\Conid{AlgFun}\{\mskip1.5mu \Varid{lam}\mathbin{::}\Conid{ExprFun}\;\Varid{t}\to \Varid{t},}$\\
+${\hskip1.00em\relax\phantom{\mathbf{data}\;\Conid{AlgFun}\;\Varid{t}\mathrel{=}\Conid{AlgFun}\{\mskip1.5mu \mbox{}}\Varid{app}\mathbin{::}\Conid{ExprFun}\;\Varid{t}\to \Varid{t},}$\\
+${\hskip1.00em\relax\phantom{\mathbf{data}\;\Conid{AlgFun}\;\Varid{t}\mathrel{=}\Conid{AlgFun}\{\mskip1.5mu \mbox{}}\Varid{var}\mathbin{::}\Conid{ExprFun}\;\Varid{t}\to \Varid{t}\mskip1.5mu\}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Functor}\;\Conid{ExprFun}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{ELambda}\;\Varid{s}\;\Varid{ty}\;\Varid{t})\mathrel{=}\Conid{ELambda}\;\Varid{s}\;\Varid{ty}\;(\Varid{f}\;\Varid{t})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{EApp}\;\Varid{t1}\;\Varid{t2})\mathrel{=}\Conid{EApp}\;(\Varid{f}\;\Varid{t1})\;(\Varid{f}\;\Varid{t2})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{EVar}\;\Varid{s})\mathrel{=}(\Conid{EVar}\;\Varid{s})}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Algebra}\;\Conid{ExprFun}\;\Conid{AlgFun}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{x}\mathord{@}(\Conid{EApp}\;\anonymous \;\anonymous )\mathrel{=}(\Varid{app}\;\Varid{alg}\;\Varid{x})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{x}\mathord{@}(\Conid{ELambda}\;\anonymous \;\anonymous \;\anonymous )\mathrel{=}(\Varid{lam}\;\Varid{alg}\;\Varid{x})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{x}\mathord{@}(\Conid{EVar}\;\anonymous )\mathrel{=}(\Varid{var}\;\Varid{alg}\;\Varid{x})}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{mkEVar}\;\Varid{x}\mathrel{=}\Varid{inn}\mathbin{\$}\Varid{sright}\mathbin{\$}\Varid{sright}\mathbin{\$}\Varid{sright}\mathbin{\$}\Conid{EVar}\;\Varid{x}}$\\
+${\hskip1.00em\relax\Varid{mkELambda}\;\Varid{x}\;\Varid{ty}\;\Varid{y}\mathrel{=}\Varid{inn}\mathbin{\$}\Varid{sright}\mathbin{\$}\Varid{sright}\mathbin{\$}\Varid{sright}\mathbin{\$}\Conid{ELambda}\;\Varid{x}\;\Varid{ty}\;\Varid{y}}$\\
+${\hskip1.00em\relax\Varid{mkEApp}\;\Varid{x}\;\Varid{y}\mathrel{=}\Varid{inn}\mathbin{\$}\Varid{sright}\mathbin{\$}\Varid{sright}\mathbin{\$}\Varid{sright}\mathbin{\$}\Conid{EApp}\;\Varid{x}\;\Varid{y}}$
+\end{tabbing}
+Note that the same five elements are defined for the collection of
+lambda terms as for previous language elements.
+
+The lambda implemented here uses a \ensuremath{\Conid{Reader}} monad to maintain
+variables and their values in the execution environment as lambdas are
+applied to values.  As each application is processes, the variable
+being replaced is paired with the value specified by the application.
+This is stored in the environment and used to determine the value of a
+variable when it is referenced.
+
+The full language is now defined as the fixed point of the sum of
+language components.  Here we have defined \ensuremath{\mathbin{:\$:}} as an infix form of
+\ensuremath{\Conid{Sum}}.  However, the semantics is unchanged.  \ensuremath{\Conid{TermType}} is the sum of
+term definitions and \ensuremath{\Conid{TermLang}} is the fixed point of the term
+definition.\footnote{\ensuremath{\Conid{Fix}} and \ensuremath{\mathbin{:\$:}} are both defined in module
+\ensuremath{\Conid{Functor}}.}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{type}\;\Conid{TermType}\mathrel{=}(\Conid{ExprConst}\mathbin{:\$:}(\Conid{ExprAdd}\mathbin{:\$:}(\Conid{ExprMult}\mathbin{:\$:}\Conid{ExprFun})))}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{type}\;\Conid{TermLang}\mathrel{=}\Conid{Fix}\;\Conid{TermType}}$
+\end{tabbing}
+We've now set up types for defining interpreters over this simple
+language, but we've not defined a specific semantics for the language.
+This is done by defining a specific algebra structure that provides
+\ensuremath{\Varid{apply}} for each term AST and summing the result to form an algebra
+for the complete language.
+
+We start by defining types and functions for manipulating the
+environment.  \ensuremath{\Conid{ValueMonad}} is the monad used to maintain the
+environment as values are calculated for terms.  \ensuremath{\Conid{Env}} is the
+environment an is defined as a single element record containing a list
+\ensuremath{\Conid{String}}, \ensuremath{\Conid{Value}} pairs associating values with variables.
+\ensuremath{\Varid{lookupVal}} and \ensuremath{\Varid{addVal}} are helper functions for looking up and
+adding variable values to the environment.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{type}\;\Conid{ValueMonad}\mathrel{=}\Conid{Reader}\;\Conid{Env}\;\Conid{Value}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{data}\;\Conid{Env}\mathrel{=}\Conid{Env}\{\mskip1.5mu \Varid{variables}\mathbin{::}[\mskip1.5mu (\Conid{String},\Conid{Value})\mskip1.5mu]\mskip1.5mu\}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{lookupVal}\;\Varid{name}\;\Varid{env}\mathrel{=}\Varid{lookup}\;\Varid{name}\;(\Varid{variables}\;\Varid{env})}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{addVal}\;\Varid{b}\;\Varid{env}\mathrel{=}\Conid{Env}\{\mskip1.5mu \Varid{variables}\mathrel{=}\Varid{b}\mathbin{:}(\Varid{variables}\;\Varid{env})\mskip1.5mu\}}$
+\end{tabbing}
+Now we define helper functions that specify how each term type is
+evaluated.  One function is defined for each AST construct.  These
+definitions could easily be directly embedded in algebra structures
+and not defined separately.  However, the algebra structure definition
+is greatly simplified by using this approach.  They will each be
+inserted into an algebra structure prior to their use.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\Varid{phiConst}\;(\Conid{EConst}\;\Varid{x})\mathrel{=}\Varid{return}\;(\Conid{ValNum}\;\Varid{x})}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{vPlus}\;(\Conid{ValNum}\;\Varid{x})\;(\Conid{ValNum}\;\Varid{y})\mathrel{=}\Conid{ValNum}\;(\Varid{x}\mathbin{+}\Varid{y})}$\\
+${\hskip1.00em\relax\Varid{vSub}\;(\Conid{ValNum}\;\Varid{x})\;(\Conid{ValNum}\;\Varid{y})\mathrel{=}\Conid{ValNum}\;(\Varid{x}\mathbin{-}\Varid{y})}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{phiAdd}\;(\Conid{EAdd}\;\Varid{x1}\;\Varid{x2})\mathrel{=}\Varid{liftM2}\;\Varid{vPlus}\;\Varid{x1}\;\Varid{x2}}$\\
+${\hskip1.00em\relax\Varid{phiSub}\;(\Conid{ESub}\;\Varid{x1}\;\Varid{x2})\mathrel{=}\Varid{liftM2}\;\Varid{vSub}\;\Varid{x1}\;\Varid{x2}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{vMult}\;(\Conid{ValNum}\;\Varid{x})\;(\Conid{ValNum}\;\Varid{y})\mathrel{=}\Conid{ValNum}\;(\Varid{x}\mathbin{*}\Varid{y})}$\\
+${\hskip1.00em\relax\Varid{vDiv}\;(\Conid{ValNum}\;\Varid{x})\;(\Conid{ValNum}\;\Varid{y})\mathrel{=}\Conid{ValNum}\;((\Varid{div})\;\Varid{x}\;\Varid{y})}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{phiMult}\;(\Conid{EMult}\;\Varid{x1}\;\Varid{x2})\mathrel{=}\Varid{liftM2}\;\Varid{vMult}\;\Varid{x1}\;\Varid{x2}}$\\
+${\hskip1.00em\relax\Varid{phiDiv}\;(\Conid{EDiv}\;\Varid{x1}\;\Varid{x2})\mathrel{=}\Varid{liftM2}\;\Varid{vDiv}\;\Varid{x1}\;\Varid{x2}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{phiLambda}\;(\Conid{ELambda}\;\Varid{s}\;\anonymous \;\Varid{t})\mathrel{=}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\mathbf{do}\;\{\mskip1.5mu \Varid{env}\leftarrow \Varid{ask}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{return}\mathbin{\$}\Conid{ValLambda}\;(\lambda \Varid{v}\to (\mathbf{do}\;\{\mskip1.5mu \Varid{v'}\leftarrow \Varid{v}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\Varid{return}\mathbin{\$}\Conid{ValLambda}\;(\lambda \Varid{v}\to (\mathbf{do}\;\mbox{}};(\Varid{local}\;(\Varid{const}\;(\Varid{addVal}\;(\Varid{s},\Varid{v'})\;\Varid{env}))\;\Varid{t})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\Varid{return}\mathbin{\$}\Conid{ValLambda}\;(\lambda \Varid{v}\to (\mathbf{do}\;\mbox{}}\mskip1.5mu\}))\mskip1.5mu\}}$\\
+${\hskip1.00em\relax\Varid{phiApp}\;(\Conid{EApp}\;\Varid{x1}\;\Varid{x2})\mathrel{=}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\mathbf{do}\;\{\mskip1.5mu \Varid{x1'}\leftarrow \Varid{x1}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\mathbf{case}\;\Varid{x1'}\;\mathbf{of}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}(\Conid{ValLambda}\;\Varid{f})\to (\Varid{f}\;\Varid{x2})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\anonymous \to \Varid{error}\;\text{\tt \char34 Cannot~apply~non-lambda~value\char34}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$\\
+${\hskip1.00em\relax\Varid{phiVar}\;(\Conid{EVar}\;\Varid{s})\mathrel{=}\mathbf{do}\;\{\mskip1.5mu \Varid{v}\leftarrow \Varid{asks}\;(\Varid{lookupVal}\;\Varid{s})}$\\
+${\hskip1.00em\relax\phantom{\Varid{phiVar}\;(\Conid{EVar}\;\Varid{s})\mathrel{=}\mathbf{do}\;\mbox{}};\mathbf{case}\;\Varid{v}\;\mathbf{of}}$\\
+${\hskip1.00em\relax\phantom{\Varid{phiVar}\;(\Conid{EVar}\;\Varid{s})\mathrel{=}\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}(\Conid{Just}\;\Varid{x})\to \Varid{return}\;\Varid{x}}$\\
+${\hskip1.00em\relax\phantom{\Varid{phiVar}\;(\Conid{EVar}\;\Varid{s})\mathrel{=}\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\Conid{Nothing}\to \Varid{error}\;\text{\tt \char34 Variable~not~found\char34}}$\\
+${\hskip1.00em\relax\phantom{\Varid{phiVar}\;(\Conid{EVar}\;\Varid{s})\mathrel{=}\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$
+\end{tabbing}
+Note the use of \ensuremath{\Varid{liftM2}} to evaluate \ensuremath{\Varid{x1}} and \ensuremath{\Varid{x2}} prior to applying
+the actual evaluation function.  In effect, \ensuremath{\Varid{x1}} and \ensuremath{\Varid{x2}} are
+evaluated in a \ensuremath{\mathbf{do}} construct, then the specified function applied and
+the result packaged back into the monad using \ensuremath{\Varid{return}}.  The
+definition of \ensuremath{\Varid{liftM2}} is in the \ensuremath{\Conid{\Conid{Control}.Monad}} package, but is
+repeated at the end of this file for documentation purposes.
+
+The full term algebra is formed by creating algebra structures for
+each term from the definitions above and summing those definitions
+together.  \ensuremath{\Conid{AlgC}}, \ensuremath{\Conid{AlgAdd}}, \ensuremath{\Conid{AlgMult}} and \ensuremath{\Conid{AlgFun}} take a function
+and build an algebra structure around it.  This is what the data type
+definitions earlier are for.  \ensuremath{\mathbin{@+@}} is an infix Sum operation for
+algebra structures.  This works the same way as the term sum to
+combine algebra structures into a single structure.\footnote{I believe
+  the order structure of this sum and the term sum must be the same.
+  Specifically, \ensuremath{\Conid{AlgCost}} and \ensuremath{\Conid{ExprConst}} are both first; \ensuremath{\Conid{AlgAdd}} and
+  \ensuremath{\Conid{ExprAdd}} are both second; and so forth.  I have not tested this
+  assumption, but it would make very good sense to do it this way.}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\Varid{termAlg}\mathrel{=}(\Conid{AlgC}\;\Varid{phiConst})}$\\
+${\hskip1.00em\relax\phantom{\Varid{termAlg}\mathrel{=}\mbox{}}\mathbin{@+@}(\Conid{AlgAdd}\;\Varid{phiAdd}\;\Varid{phiSub})}$\\
+${\hskip1.00em\relax\phantom{\Varid{termAlg}\mathrel{=}\mbox{}}\mathbin{@+@}(\Conid{AlgMult}\;\Varid{phiMult}\;\Varid{phiDiv})}$\\
+${\hskip1.00em\relax\phantom{\Varid{termAlg}\mathrel{=}\mbox{}}\mathbin{@+@}(\Conid{AlgFun}\;\Varid{phiLambda}\;\Varid{phiApp}\;\Varid{phiVar})}$
+\end{tabbing}
+The \ensuremath{\Varid{evalFun}} function composes \ensuremath{\Varid{runReader}} and \ensuremath{\Varid{cata}} to define
+evaluation.  The heart of this function is the polytypic fold, or
+catamorphism.  \ensuremath{(\Varid{cata}\;\Varid{termAlg})} instantiates the \ensuremath{\Varid{cata}} function with
+the evaluation algebra.  When applied to a term, it will produce a
+\ensuremath{\Conid{ValueMonad}} that is then evaluated by \ensuremath{\Varid{runReader}}.  
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\Varid{evalFun}\mathrel{=}\Varid{runReader}\mathbin{\circ}(\Varid{cata}\;\Varid{termAlg})}$
+\end{tabbing}
+An initial value for the environment must be provided to \ensuremath{\Varid{evalFun}} for
+the reader to evaluate completely.  To evaluate \ensuremath{\Varid{term}_1} starting with
+an empty environment, execute the following:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax(\Varid{evalFun}\;\Varid{term}_1)\;\Conid{Env}\{\mskip1.5mu \Varid{variables}\mathrel{=}[\mskip1.5mu \mskip1.5mu]\mskip1.5mu\}}$
+\end{tabbing}
+Now let's have some fun and define a different evaluation function for
+this language.  If all is well, we should be able to define a new
+algebra structure, use the same sum and evaluate the language over a
+different carrier set.  For this experiment, we'll use the simple
+odd/even carrier set.
+
+First define the odd/even data type and some helper functions.
+Probably could use instances and continue to use + and *, but that's
+more than we really want to do here.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{data}\;\Conid{OE}\mathrel{=}\Conid{Odd}\mid \Conid{Even}\;\mathbf{deriving}\;(\Conid{Show},\Conid{Eq})}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{oePlus}\mathbin{::}\Conid{OE}\to \Conid{OE}\to \Conid{OE}}$\\
+${\hskip1.00em\relax\Varid{oePlus}\;\Conid{Odd}\;\Conid{Odd}\mathrel{=}\Conid{Even}}$\\
+${\hskip1.00em\relax\Varid{oePlus}\;\Conid{Odd}\;\Conid{Even}\mathrel{=}\Conid{Odd}}$\\
+${\hskip1.00em\relax\Varid{oePlus}\;\Conid{Even}\;\Conid{Odd}\mathrel{=}\Conid{Odd}}$\\
+${\hskip1.00em\relax\Varid{oePlus}\;\Conid{Even}\;\Conid{Even}\mathrel{=}\Conid{Even}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{oeTimes}\mathbin{::}\Conid{OE}\to \Conid{OE}\to \Conid{OE}}$\\
+${\hskip1.00em\relax\Varid{oeTimes}\;\Conid{Odd}\;\Conid{Odd}\mathrel{=}\Conid{Odd}}$\\
+${\hskip1.00em\relax\Varid{oeTimes}\;\Conid{Odd}\;\Conid{Even}\mathrel{=}\Conid{Even}}$\\
+${\hskip1.00em\relax\Varid{oeTimes}\;\Conid{Even}\;\Conid{Odd}\mathrel{=}\Conid{Even}}$\\
+${\hskip1.00em\relax\Varid{oeTimes}\;\Conid{Even}\;\Conid{Even}\mathrel{=}\Conid{Even}}$
+\end{tabbing}
+Second, define the evaluation functions that we'll use with \ensuremath{\Varid{apply}}.
+For these definitions, we'll define \ensuremath{\Varid{\alpha}}, the abstraction function
+for constant values, and define the various evaluation functions using
+\ensuremath{\Varid{\alpha}} when necessary.  This will allow us to check soundness later.
+Note that we have to be careful about the name space and use unique
+names here.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{data}\;\Conid{AbsValue}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\mathrel{=}\Conid{AbsValNum}\;\Conid{OE}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\mid \Conid{AbsValLambda}\;(\Conid{AbsValueMonad}\to \Conid{AbsValueMonad})}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Show}\;\Conid{AbsValue}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{show}\;(\Conid{AbsValNum}\;\Varid{v})\mathrel{=}\Varid{show}\;\Varid{v}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{show}\;(\Conid{AbsValLambda}\;\anonymous )\mathrel{=}\text{\tt \char34 <Abstract~Function~Value>\char34}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{instance}\;\Conid{Eq}\;\Conid{AbsValue}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax(\equiv )\;(\Conid{AbsValNum}\;\Varid{x})\;(\Conid{AbsValNum}\;\Varid{y})\mathrel{=}(\Varid{x}\equiv \Varid{y})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax(\equiv )\;(\Conid{AbsValLambda}\;\Varid{x})\;(\Conid{AbsValLambda}\;\Varid{y})\mathrel{=}\Varid{error}\;\text{\tt \char34 Cannot~compare~functions.\char34}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{type}\;\Conid{AbsValueMonad}\mathrel{=}\Conid{Reader}\;\Conid{AbsEnv}\;\Conid{AbsValue}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{data}\;\Conid{AbsEnv}\mathrel{=}\Conid{AbsEnv}\{\mskip1.5mu \Varid{absVariables}\mathbin{::}[\mskip1.5mu (\Conid{String},\Conid{AbsValue})\mskip1.5mu]\mskip1.5mu\}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{lookupAbsVal}\;\Varid{name}\;\Varid{env}\mathrel{=}\Varid{lookup}\;\Varid{name}\;(\Varid{absVariables}\;\Varid{env})}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{addAbsVal}\;\Varid{b}\;\Varid{env}\mathrel{=}\Conid{AbsEnv}\{\mskip1.5mu \Varid{absVariables}\mathrel{=}\Varid{b}\mathbin{:}(\Varid{absVariables}\;\Varid{env})\mskip1.5mu\}}$
+\end{tabbing}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\Varid{\alpha}\;\Varid{x}\mathrel{=}\Conid{AbsValNum}\mathbin{\$}\mathbf{if}\;(\Varid{odd}\;\Varid{x})\;\mathbf{then}\;\Conid{Odd}\;\mathbf{else}\;\Conid{Even}}$
+\end{tabbing}
+Now define evaluation functions for each element of the AST:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\Varid{phi1Const}\;(\Conid{EConst}\;\Varid{x})\mathrel{=}\Varid{return}\;(\Varid{\alpha}\;\Varid{x})}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{aPlus}\;(\Conid{AbsValNum}\;\Varid{x})\;(\Conid{AbsValNum}\;\Varid{y})\mathrel{=}\Conid{AbsValNum}\;(\Varid{oePlus}\;\Varid{x}\;\Varid{y})}$\\
+${\hskip1.00em\relax\Varid{phi1Add}\;(\Conid{EAdd}\;\Varid{x1}\;\Varid{x2})\mathrel{=}\Varid{liftM2}\;\Varid{aPlus}\;\Varid{x1}\;\Varid{x2}}$\\
+${\hskip1.00em\relax\Varid{phi1Sub}\;(\Conid{ESub}\;\Varid{x1}\;\Varid{x2})\mathrel{=}\Varid{liftM2}\;\Varid{aPlus}\;\Varid{x1}\;\Varid{x2}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{aTimes}\;(\Conid{AbsValNum}\;\Varid{x})\;(\Conid{AbsValNum}\;\Varid{y})\mathrel{=}\Conid{AbsValNum}\;(\Varid{oeTimes}\;\Varid{x}\;\Varid{y})}$\\
+${\hskip1.00em\relax\Varid{phi1Mult}\;(\Conid{EMult}\;\Varid{x1}\;\Varid{x2})\mathrel{=}\Varid{liftM2}\;\Varid{aTimes}\;\Varid{x1}\;\Varid{x2}}$\\
+${\hskip1.00em\relax\Varid{phi1Div}\;(\Conid{EDiv}\;\Varid{x1}\;\Varid{x2})\mathrel{=}\Varid{liftM2}\;\Varid{aTimes}\;\Varid{x1}\;\Varid{x2}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{phi1Lambda}\;(\Conid{ELambda}\;\Varid{s}\;\anonymous \;\Varid{t})\mathrel{=}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\mathbf{do}\;\{\mskip1.5mu \Varid{env}\leftarrow \Varid{ask}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{return}\mathbin{\$}\Conid{AbsValLambda}\;(\lambda \Varid{v}\to (\mathbf{do}\;\{\mskip1.5mu \Varid{v'}\leftarrow \Varid{v}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\Varid{return}\mathbin{\$}\Conid{AbsValLambda}\;(\lambda \Varid{v}\to (\mathbf{do}\;\mbox{}};(\Varid{local}\;(\Varid{const}\;(\Varid{addAbsVal}\;(\Varid{s},\Varid{v'})\;\Varid{env}))\;\Varid{t})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\Varid{return}\mathbin{\$}\Conid{AbsValLambda}\;(\lambda \Varid{v}\to (\mathbf{do}\;\mbox{}}\mskip1.5mu\}))\mskip1.5mu\}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{phi1App}\;(\Conid{EApp}\;\Varid{x1}\;\Varid{x2})\mathrel{=}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\mathbf{do}\;\{\mskip1.5mu \Varid{x1'}\leftarrow \Varid{x1}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\mathbf{case}\;\Varid{x1'}\;\mathbf{of}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}(\Conid{AbsValLambda}\;\Varid{f})\to (\Varid{f}\;\Varid{x2})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\anonymous \to \Varid{error}\;\text{\tt \char34 Cannot~apply~non-lambda~value\char34}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{phi1Var}\;(\Conid{EVar}\;\Varid{s})\mathrel{=}\mathbf{do}\;\{\mskip1.5mu \Varid{v}\leftarrow \Varid{asks}\;(\Varid{lookupAbsVal}\;\Varid{s})}$\\
+${\hskip1.00em\relax\hskip10.50em\relax;\mathbf{case}\;\Varid{v}\;\mathbf{of}}$\\
+${\hskip1.00em\relax\hskip10.50em\relax\phantom{;\mbox{}}(\Conid{Just}\;\Varid{x})\to \Varid{return}\;\Varid{x}}$\\
+${\hskip1.00em\relax\hskip10.50em\relax\phantom{;\mbox{}}\Conid{Nothing}\to \Varid{error}\;\text{\tt \char34 Variable~not~found\char34}}$\\
+${\hskip1.00em\relax\hskip10.50em\relax\mskip1.5mu\}}$
+\end{tabbing}
+Finally, create the algebra structures for each term and sum them
+together to create the term algebra.  The helper function \ensuremath{\Varid{evalPar}} is
+identical to \ensuremath{\Varid{evalFun}} defined previously except it uses the abstract
+interpreter.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\Varid{term1Alg}\mathrel{=}(\Conid{AlgC}\;\Varid{phi1Const})}$\\
+${\hskip1.00em\relax\phantom{\Varid{term1Alg}\mbox{}}\mathbin{@+@}(\Conid{AlgAdd}\;\Varid{phi1Add}\;\Varid{phi1Sub})}$\\
+${\hskip1.00em\relax\phantom{\Varid{term1Alg}\mbox{}}\mathbin{@+@}(\Conid{AlgMult}\;\Varid{phi1Mult}\;\Varid{phi1Div})}$\\
+${\hskip1.00em\relax\phantom{\Varid{term1Alg}\mbox{}}\mathbin{@+@}(\Conid{AlgFun}\;\Varid{phi1Lambda}\;\Varid{phi1App}\;\Varid{phi1Var})}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{evalPar}\mathrel{=}\Varid{runReader}\mathbin{\circ}(\Varid{cata}\;\Varid{term1Alg})}$
+\end{tabbing}
+We're done.  Now we can use the same terms as before to test the new
+abstract interpreter.
+
+One more interesting thing before we quit is evaluating soundness of
+the abstract interpretation.  Specifically, does applying the
+abstraction function after interpretation result in the same value as
+abstract interpretation?  If so, then $\alpha(\phi_c(m))=\phi_a(m)$
+where $\phi_c$ is concrete interpretation and $\phi_a$ is abstract
+interpretation.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\Varid{soundTest}\;\Varid{c}\;\Varid{a}\;\Varid{\alpha}\;\Varid{x}\mathrel{=}\mathbf{do}\;\{\mskip1.5mu \Varid{x'}\leftarrow \Varid{cata}\;\Varid{c}\;\Varid{x}}$\\
+${\hskip1.00em\relax\phantom{\Varid{soundTest}\;\Varid{c}\;\Varid{a}\;\Varid{\alpha}\;\Varid{x}\mathrel{=}\mathbf{do}\;\mbox{}};\Varid{x''}\leftarrow \Varid{cata}\;\Varid{a}\;\Varid{x}}$\\
+${\hskip1.00em\relax\phantom{\Varid{soundTest}\;\Varid{c}\;\Varid{a}\;\Varid{\alpha}\;\Varid{x}\mathrel{=}\mathbf{do}\;\mbox{}};\Varid{return}\;(\Varid{x''}\equiv (\Varid{\alpha}\;\Varid{x'}))}$\\
+${\hskip1.00em\relax\phantom{\Varid{soundTest}\;\Varid{c}\;\Varid{a}\;\Varid{\alpha}\;\Varid{x}\mathrel{=}\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{sound}\;\Varid{x}\mathrel{=}\mathbf{case}\;\Varid{v}\;\mathbf{of}}$\\
+${\hskip1.00em\relax\phantom{\Varid{sound}\;\Varid{x}\mathrel{=}\mbox{}}(\Conid{ValNum}\;\Varid{a})\to \mathbf{case}\;\Varid{av}\;\mathbf{of}}$\\
+${\hskip1.00em\relax\phantom{\Varid{sound}\;\Varid{x}\mathrel{=}\mbox{}}\phantom{(\Conid{ValNum}\;\Varid{a})\to \mbox{}}\Varid{c}\mathord{@}(\Conid{AbsValNum}\;\Varid{b})\to \Varid{\alpha}\;\Varid{a}\equiv \Varid{c}}$\\
+${\hskip1.00em\relax\phantom{\Varid{sound}\;\Varid{x}\mathrel{=}\mbox{}}\phantom{(\Conid{ValNum}\;\Varid{a})\to \mbox{}}\anonymous \to \Conid{False}}$\\
+${\hskip1.00em\relax\phantom{\Varid{sound}\;\Varid{x}\mathrel{=}\mbox{}}(\Conid{ValLambda}\;\anonymous )\to \mathbf{case}\;\Varid{av}\;\mathbf{of}}$\\
+${\hskip1.00em\relax\phantom{\Varid{sound}\;\Varid{x}\mathrel{=}\mbox{}}\phantom{(\Conid{ValLambda}\;\anonymous )\to \mbox{}}(\Conid{AbsValLambda}\;\anonymous )\to \Varid{error}\;\text{\tt \char34 Cannot~compare~functions\char34}}$\\
+${\hskip1.00em\relax\phantom{\Varid{sound}\;\Varid{x}\mathrel{=}\mbox{}}\phantom{(\Conid{ValLambda}\;\anonymous )\to \mbox{}}\anonymous \to \Conid{False}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\mathbf{where}\;\Varid{v}\mathrel{=}(\Varid{evalFun}\;\Varid{x}\;\Conid{Env}\{\mskip1.5mu \Varid{variables}\mathrel{=}[\mskip1.5mu \mskip1.5mu]\mskip1.5mu\});}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mathbf{where}\;\mbox{}}\Varid{av}\mathrel{=}(\Varid{evalPar}\;\Varid{x}\;\Conid{AbsEnv}\{\mskip1.5mu \Varid{absVariables}\mathrel{=}[\mskip1.5mu \mskip1.5mu]\mskip1.5mu\})}$
+\end{tabbing}
+Now let's have even more fun.  Using the same algebraic structure, we
+can define a type checker for our tiny language by once again defining
+a new value space and associated \ensuremath{\Varid{\phi}} functions.  We'll leave it to
+the reader to determine what's going on here.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mathbf{data}\;\Conid{TyValue}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\mathrel{=}\Conid{TyInt}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\mid \Conid{TyValue}\mathbin{:->:}\Conid{TyValue}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mid \mbox{}}\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{data}\;\Conid{Gamma}\mathrel{=}\Conid{Gamma}\{\mskip1.5mu \Varid{\gamma}\mathbin{::}[\mskip1.5mu (\Conid{String},\Conid{TyValue})\mskip1.5mu]\mskip1.5mu\}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{lookupTy}\;\Varid{name}\;\Varid{gam}\mathrel{=}\Varid{lookup}\;\Varid{name}\;(\Varid{\gamma}\;\Varid{gam})}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{addBinding}\;\Varid{b}\;\Varid{gam}\mathrel{=}\Conid{Gamma}\{\mskip1.5mu \Varid{\gamma}\mathrel{=}\Varid{b}\mathbin{:}(\Varid{\gamma}\;\Varid{gam})\mskip1.5mu\}}$\\
+${}$\\
+${\hskip1.00em\relax\mathbf{type}\;\Conid{TyMonad}\mathrel{=}\Conid{Reader}\;\Conid{Gamma}\;\Conid{TyValue}}$
+\end{tabbing}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\Varid{tyConst}\;(\Conid{EConst}\;\Varid{x})\mathrel{=}\Varid{return}\;\Conid{TyInt}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{tPlus}\;\Conid{TyInt}\;\Conid{TyInt}\mathrel{=}\Conid{TyInt}}$\\
+${\hskip1.00em\relax\Varid{tPlus}\;(\anonymous \mathbin{:->:}\anonymous )\;\anonymous \mathrel{=}\Varid{error}\;\text{\tt \char34 Cannot~add~function~value\char34}}$\\
+${\hskip1.00em\relax\Varid{tPlus}\;\anonymous \;(\anonymous \mathbin{:->:}\anonymous )\mathrel{=}\Varid{error}\;\text{\tt \char34 Cannot~add~function~value\char34}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{tSub}\;\Conid{TyInt}\;\Conid{TyInt}\mathrel{=}\Conid{TyInt}}$\\
+${\hskip1.00em\relax\Varid{tSub}\;(\anonymous \mathbin{:->:}\anonymous )\;\anonymous \mathrel{=}\Varid{error}\;\text{\tt \char34 Cannot~subtract~function~value\char34}}$\\
+${\hskip1.00em\relax\Varid{tSub}\;\anonymous \;(\anonymous \mathbin{:->:}\anonymous )\mathrel{=}\Varid{error}\;\text{\tt \char34 Cannot~subtract~function~value\char34}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{tyAdd}\;(\Conid{EAdd}\;\Varid{x1}\;\Varid{x2})\mathrel{=}\Varid{liftM2}\;\Varid{tPlus}\;\Varid{x1}\;\Varid{x2}}$\\
+${\hskip1.00em\relax\Varid{tySub}\;(\Conid{ESub}\;\Varid{x1}\;\Varid{x2})\mathrel{=}\Varid{liftM2}\;\Varid{tSub}\;\Varid{x1}\;\Varid{x2}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{tMult}\;\Conid{TyInt}\;\Conid{TyInt}\mathrel{=}\Conid{TyInt}}$\\
+${\hskip1.00em\relax\Varid{tMult}\;(\anonymous \mathbin{:->:}\anonymous )\;\anonymous \mathrel{=}\Varid{error}\;\text{\tt \char34 Cannot~multiply~function~value\char34}}$\\
+${\hskip1.00em\relax\Varid{tMult}\;\anonymous \;(\anonymous \mathbin{:->:}\anonymous )\mathrel{=}\Varid{error}\;\text{\tt \char34 Cannot~multiply~function~value\char34}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{tDiv}\;\Conid{TyInt}\;\Conid{TyInt}\mathrel{=}\Conid{TyInt}}$\\
+${\hskip1.00em\relax\Varid{tDiv}\;(\anonymous \mathbin{:->:}\anonymous )\;\anonymous \mathrel{=}\Varid{error}\;\text{\tt \char34 Cannot~divide~function~value\char34}}$\\
+${\hskip1.00em\relax\Varid{tDiv}\;\anonymous \;(\anonymous \mathbin{:->:}\anonymous )\mathrel{=}\Varid{error}\;\text{\tt \char34 Cannot~divide~function~value\char34}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{tyMult}\;(\Conid{EMult}\;\Varid{x1}\;\Varid{x2})\mathrel{=}\Varid{liftM2}\;\Varid{tMult}\;\Varid{x1}\;\Varid{x2}}$\\
+${\hskip1.00em\relax\Varid{tyDiv}\;(\Conid{EDiv}\;\Varid{x1}\;\Varid{x2})\mathrel{=}\Varid{liftM2}\;\Varid{tDiv}\;\Varid{x1}\;\Varid{x2}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{tyLambda}\;(\Conid{ELambda}\;\Varid{s}\;\Varid{ty}\;\Varid{t})\mathrel{=}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\mathbf{do}\;\{\mskip1.5mu \Varid{g}\leftarrow \Varid{ask}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{t'}\leftarrow (\Varid{local}\;(\Varid{const}\;(\Varid{addBinding}\;(\Varid{s},\Conid{TyInt})\;\Varid{g}))\;\Varid{t})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{return}\;(\Varid{ty}\mathbin{:->:}\Varid{t'})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{tyApp}\;(\Conid{EApp}\;\Varid{x1}\;\Varid{x2})\mathrel{=}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\mathbf{do}\;\{\mskip1.5mu \Varid{x1'}\leftarrow \Varid{x1}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{x2'}\leftarrow \Varid{x2}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\mathbf{case}\;\Varid{x1'}\;\mathbf{of}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}(\Varid{t1}\mathbin{:->:}\Varid{t2})\to \mathbf{if}\;(\Varid{t1}\equiv \Varid{x2'})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\phantom{(\Varid{t1}\mathbin{:->:}\Varid{t2})\to \mbox{}}\mathbf{then}\;(\Varid{return}\;\Varid{t2})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\phantom{(\Varid{t1}\mathbin{:->:}\Varid{t2})\to \mbox{}}\mathbf{else}\;(\Varid{error}\;\text{\tt \char34 Input~parameter~of~wrong~type\char34})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mbox{}}\anonymous \to \Varid{error}\;\text{\tt \char34 Cannot~apply~non-lambda~value\char34}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{tyVar}\;(\Conid{EVar}\;\Varid{s})\mathrel{=}\mathbf{do}\;\{\mskip1.5mu \Varid{v}\leftarrow \Varid{asks}\;(\Varid{lookupTy}\;\Varid{s})}$\\
+${\hskip1.00em\relax\phantom{\Varid{tyVar}\;(\Conid{EVar}\;\Varid{s})\mathrel{=}\mathbf{do}\;\{\mskip1.5mu \mbox{}};\mathbf{case}\;\Varid{v}\;\mathbf{of}}$\\
+${\hskip1.00em\relax\phantom{\Varid{tyVar}\;(\Conid{EVar}\;\Varid{s})\mathrel{=}\mathbf{do}\;\{\mskip1.5mu \mbox{}}(\Conid{Just}\;\Varid{x})\to \Varid{return}\;\Varid{x}}$\\
+${\hskip1.00em\relax\phantom{\Varid{tyVar}\;(\Conid{EVar}\;\Varid{s})\mathrel{=}\mathbf{do}\;\{\mskip1.5mu \mbox{}}\Conid{Nothing}\to \Varid{error}\;\text{\tt \char34 Variable~not~found\char34}}$\\
+${\hskip1.00em\relax\phantom{\Varid{tyVar}\;(\Conid{EVar}\;\Varid{s})\mathrel{=}\mathbf{do}\;\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{tyAlg}\mathrel{=}(\Conid{AlgC}\;\Varid{tyConst})}$\\
+${\hskip1.00em\relax\hskip5.00em\relax\mathbin{@+@}(\Conid{AlgAdd}\;\Varid{tyAdd}\;\Varid{tySub})}$\\
+${\hskip1.00em\relax\hskip5.00em\relax\mathbin{@+@}(\Conid{AlgMult}\;\Varid{tyMult}\;\Varid{tyDiv})}$\\
+${\hskip1.00em\relax\hskip5.00em\relax\mathbin{@+@}(\Conid{AlgFun}\;\Varid{tyLambda}\;\Varid{tyApp}\;\Varid{tyVar})}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{typeof}\mathrel{=}\Varid{runReader}\mathbin{\circ}(\Varid{cata}\;\Varid{tyAlg})}$
+\end{tabbing}
+That's it.  The type checker in less than a page.  Not bad at all.
+
+The remaining definitions are helper functions for creating terms and
+calling \ensuremath{\Varid{cata}} to perform evaluation.  All are worth looking at to see
+the structure of terms and to see the use of monads during evaluation.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\Varid{sright}\mathrel{=}\Conid{S}\mathbin{\circ}\Conid{Right}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{sleft}\mathrel{=}\Conid{S}\mathbin{\circ}\Conid{Left}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{term}_1\mathrel{=}\Varid{mkEConst}\;\mathrm{1}}$\\
+${\hskip1.00em\relax\Varid{term}_2\mathrel{=}\Varid{mkEAdd}\;\Varid{term}_1\;\Varid{term}_1}$\\
+${\hskip1.00em\relax\Varid{term}_3\mathrel{=}\Varid{mkEMult}\;\Varid{term}_2\;\Varid{term}_2}$\\
+${\hskip1.00em\relax\Varid{term}_4\mathrel{=}\Varid{mkESub}\;\Varid{term}_1\;\Varid{term}_1}$\\
+${\hskip1.00em\relax\Varid{term}_5\mathrel{=}\Varid{mkEDiv}\;\Varid{term}_1\;\Varid{term}_1}$\\
+${\hskip1.00em\relax\Varid{term}_6\mathrel{=}\Varid{mkEVar}\;\text{\tt \char34 x\char34}}$\\
+${\hskip1.00em\relax\Varid{term}_7\mathrel{=}\Varid{mkELambda}\;\text{\tt \char34 x\char34}\;\Conid{TyInt}\;\Varid{term}_6}$\\
+${\hskip1.00em\relax\Varid{term}_8\mathrel{=}\Varid{mkEApp}\;\Varid{term}_7\;\Varid{term}_1}$\\
+${\hskip1.00em\relax\Varid{term}_9\mathrel{=}\Varid{mkELambda}\;\text{\tt \char34 x\char34}\;\Conid{TyInt}\;(\Varid{mkEAdd}\;\Varid{term}_6\;\Varid{term}_6)}$\\
+${\hskip1.00em\relax\Varid{term}_{10}\mathrel{=}\Varid{mkEApp}\;\Varid{term}_9\;\Varid{term}_1}$\\
+${\hskip1.00em\relax\Varid{term11}\mathrel{=}\Varid{mkELambda}\;\text{\tt \char34 x\char34}\;\Conid{TyInt}\;(\Varid{mkELambda}\;\text{\tt \char34 y\char34}\;\Conid{TyInt}\;(\Varid{mkEAdd}\;\Varid{term}_1\;\Varid{term}_1))}$\\
+${\hskip1.00em\relax\Varid{term12}\mathrel{=}\Varid{mkEApp}\;(\Varid{mkEApp}\;\Varid{term11}\;\Varid{term}_1)\;\Varid{term}_1}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{emptyG}\mathrel{=}\Conid{Gamma}\{\mskip1.5mu \Varid{\gamma}\mathrel{=}[\mskip1.5mu \mskip1.5mu]\mskip1.5mu\}}$\\
+${\hskip1.00em\relax\Varid{emptyE}\mathrel{=}\Conid{Env}\{\mskip1.5mu \Varid{variables}\mathrel{=}[\mskip1.5mu \mskip1.5mu]\mskip1.5mu\}}$\\
+${\hskip1.00em\relax\Varid{emptyAE}\mathrel{=}\Conid{AbsEnv}\{\mskip1.5mu \Varid{absVariables}\mathrel{=}[\mskip1.5mu \mskip1.5mu]\mskip1.5mu\}}$
+\end{tabbing}
+I always forget the definitions of \ensuremath{\Varid{liftM}} and \ensuremath{\Varid{liftM2}}, so I'll
+include them here in a specification block for reference.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\mbox{\qquad-{}-  Defined in Control.Monad}}$\\
+${\hskip1.00em\relax\Varid{liftM2}\;\Varid{f}\;\Varid{m1}\;\Varid{m2}\mathrel{=}\mathbf{do}\;\Varid{x1}\leftarrow \Varid{m1}}$\\
+${\hskip1.00em\relax\phantom{\Varid{liftM2}\;\Varid{f}\;\Varid{m1}\;\Varid{m2}\mathrel{=}\mathbf{do}\;\mbox{}}\Varid{x2}\leftarrow \Varid{m2}}$\\
+${\hskip1.00em\relax\phantom{\Varid{liftM2}\;\Varid{f}\;\Varid{m1}\;\Varid{m2}\mathrel{=}\mathbf{do}\;\mbox{}}\Varid{return}\;(\Varid{f}\;\Varid{x1}\;\Varid{x2})}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{liftM}\;\Varid{f}\;\Varid{m1}\mathrel{=}\mathbf{do}\;\Varid{x}\leftarrow \Varid{m}}$\\
+${\hskip1.00em\relax\phantom{\Varid{liftM}\;\Varid{f}\;\Varid{m1}\mathrel{=}\mathbf{do}\;\mbox{}}\Varid{return}\;(\Varid{f}\;\Varid{x})}$
+\end{tabbing}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\hskip1.00em\relax\Varid{toTmLang}\mathbin{::}(\Conid{SubType}\;\Varid{f}\;\Conid{TermType})\Rightarrow \Varid{f}\;\Conid{TermLang}\to \Conid{TermLang}}$\\
+${\hskip1.00em\relax\Varid{toTmLang}\mathrel{=}\Varid{inj}}$
+\end{tabbing}
+\section{Term Libraries}
+
+Included with the base \ensuremath{\Conid{InterpreterLib}} system are a collection of
+Imodules for building various terms and data structures.  These
+Ilibraries simply provide boilerplate for structuring algebras.  They
+Ido note define semantics for the abstract syntax structures they
+Idefine.  The libraries are intended to serve as both documentation
+Iand building blocks for interpreters.
+
+\subsection{Arithmetic Terms}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mbox{\enskip\{-\# OPTIONS -fglasgow-exts -fallow-overlapping-instances -fallow-undecidable-instances -fno-monomorphism-restriction  \#-\}\enskip}}$\\
+${}$\\
+${\mathbf{module}\;\Conid{\Conid{InterpreterLib}.\Conid{Terms}.ArithTerm}\;\mathbf{where}}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Algebras}}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Functors}}$
+\end{tabbing}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{ArithTerm}\;\Varid{x}\mathrel{=}\Conid{Add}\;\Varid{x}\;\Varid{x}}$\\
+${\phantom{\mathbf{data}\;\Conid{ArithTerm}\;\Varid{x}\mbox{}}\mid \Conid{Sub}\;\Varid{x}\;\Varid{x}}$\\
+${\phantom{\mathbf{data}\;\Conid{ArithTerm}\;\Varid{x}\mbox{}}\mid \Conid{Mult}\;\Varid{x}\;\Varid{x}}$\\
+${\phantom{\mathbf{data}\;\Conid{ArithTerm}\;\Varid{x}\mbox{}}\mid \Conid{Div}\;\Varid{x}\;\Varid{x}}$\\
+${\phantom{\mathbf{data}\;\Conid{ArithTerm}\;\Varid{x}\mbox{}}\mid \Conid{NumEq}\;\Varid{x}\;\Varid{x}}$\\
+${\phantom{\mathbf{data}\;\Conid{ArithTerm}\;\Varid{x}\mbox{}}\mid \Conid{Num}\;\Conid{Int}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Functor}\;\Conid{ArithTerm}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{Add}\;\Varid{x}\;\Varid{y})\mathrel{=}\Conid{Add}\;(\Varid{f}\;\Varid{x})\;(\Varid{f}\;\Varid{y})}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{Sub}\;\Varid{x}\;\Varid{y})\mathrel{=}\Conid{Sub}\;(\Varid{f}\;\Varid{x})\;(\Varid{f}\;\Varid{y})}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{Mult}\;\Varid{x}\;\Varid{y})\mathrel{=}\Conid{Mult}\;(\Varid{f}\;\Varid{x})\;(\Varid{f}\;\Varid{y})}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{Div}\;\Varid{x}\;\Varid{y})\mathrel{=}\Conid{Div}\;(\Varid{f}\;\Varid{x})\;(\Varid{f}\;\Varid{y})}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{NumEq}\;\Varid{x}\;\Varid{y})\mathrel{=}\Conid{NumEq}\;(\Varid{f}\;\Varid{x})\;(\Varid{f}\;\Varid{y})}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{Num}\;\Varid{x})\mathrel{=}\Conid{Num}\;\Varid{x}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{ZipFunctor}\;\Conid{ArithTerm}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{Add}\;\Varid{x}\;\Varid{y})\;(\Conid{Add}\;\Varid{a}\;\Varid{b})\mathrel{=}\Varid{return}\mathbin{\$}\Conid{Add}\;(\Varid{f}\;\Varid{x}\;\Varid{a})\;(\Varid{f}\;\Varid{y}\;\Varid{b})}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{Sub}\;\Varid{x}\;\Varid{y})\;(\Conid{Sub}\;\Varid{a}\;\Varid{b})\mathrel{=}\Varid{return}\mathbin{\$}\Conid{Sub}\;(\Varid{f}\;\Varid{x}\;\Varid{a})\;(\Varid{f}\;\Varid{y}\;\Varid{b})}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{Mult}\;\Varid{x}\;\Varid{y})\;(\Conid{Mult}\;\Varid{a}\;\Varid{b})\mathrel{=}\Varid{return}\mathbin{\$}\Conid{Mult}\;(\Varid{f}\;\Varid{x}\;\Varid{a})\;(\Varid{f}\;\Varid{y}\;\Varid{b})}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{Div}\;\Varid{x}\;\Varid{y})\;(\Conid{Div}\;\Varid{a}\;\Varid{b})\mathrel{=}\Varid{return}\mathbin{\$}\Conid{Div}\;(\Varid{f}\;\Varid{x}\;\Varid{a})\;(\Varid{f}\;\Varid{y}\;\Varid{b})}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{NumEq}\;\Varid{x}\;\Varid{y})\;(\Conid{NumEq}\;\Varid{a}\;\Varid{b})\mathrel{=}\Varid{return}\mathbin{\$}\Conid{NumEq}\;(\Varid{f}\;\Varid{x}\;\Varid{a})\;(\Varid{f}\;\Varid{y}\;\Varid{b})}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{Num}\;\Varid{x})\;(\Conid{Num}\;\Varid{y})\mathrel{=}\Varid{return}\mathbin{\$}\Conid{Num}\;\Varid{x}}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;\anonymous \;\anonymous \mathrel{=}\Varid{fail}\;\text{\tt \char34 No~match\char34}}$
+\end{tabbing}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{ArithTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{ArithTermAlgebra}\{\mskip1.5mu \Varid{add}\mathbin{::}\Conid{AlgSig}\;\Conid{ArithTerm}\;\Varid{a},}$\\
+${\phantom{\mathbf{data}\;\Conid{ArithTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{ArithTermAlgebra}\{\mskip1.5mu \mbox{}}\Varid{sub}\mathbin{::}\Conid{AlgSig}\;\Conid{ArithTerm}\;\Varid{a},}$\\
+${\phantom{\mathbf{data}\;\Conid{ArithTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{ArithTermAlgebra}\{\mskip1.5mu \mbox{}}\Varid{mult}\mathbin{::}\Conid{AlgSig}\;\Conid{ArithTerm}\;\Varid{a},}$\\
+${\phantom{\mathbf{data}\;\Conid{ArithTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{ArithTermAlgebra}\{\mskip1.5mu \mbox{}}\Varid{divide}\mathbin{::}\Conid{AlgSig}\;\Conid{ArithTerm}\;\Varid{a},}$\\
+${\phantom{\mathbf{data}\;\Conid{ArithTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{ArithTermAlgebra}\{\mskip1.5mu \mbox{}}\Varid{numEq}\mathbin{::}\Conid{AlgSig}\;\Conid{ArithTerm}\;\Varid{a},}$\\
+${\phantom{\mathbf{data}\;\Conid{ArithTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{ArithTermAlgebra}\{\mskip1.5mu \mbox{}}\Varid{num}\mathbin{::}\Conid{AlgSig}\;\Conid{ArithTerm}\;\Varid{a}}$\\
+${\phantom{\mathbf{data}\;\Conid{ArithTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{ArithTermAlgebra}\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Algebra}\;\Conid{ArithTerm}\;\Conid{ArithTermAlgebra}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{Add}\;\anonymous \;\anonymous )\mathrel{=}\Varid{add}\;\Varid{alg}\;\Varid{t}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{Sub}\;\anonymous \;\anonymous )\mathrel{=}\Varid{sub}\;\Varid{alg}\;\Varid{t}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{Mult}\;\anonymous \;\anonymous )\mathrel{=}\Varid{mult}\;\Varid{alg}\;\Varid{t}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{Div}\;\anonymous \;\anonymous )\mathrel{=}\Varid{divide}\;\Varid{alg}\;\Varid{t}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{NumEq}\;\anonymous \;\anonymous )\mathrel{=}\Varid{numEq}\;\Varid{alg}\;\Varid{t}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{Num}\;\anonymous )\mathrel{=}\Varid{num}\;\Varid{alg}\;\Varid{t}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{AlgebraBuilder}\;\Conid{ArithTerm}\;(\Conid{ArithTerm}\;\Varid{a}\to \Varid{a})\;\Conid{ArithTermAlgebra}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{mkAlgebra}\;\Varid{f}\mathrel{=}\Conid{ArithTermAlgebra}\;\Varid{f}\;\Varid{f}\;\Varid{f}\;\Varid{f}\;\Varid{f}\;\Varid{f}}$
+\end{tabbing}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{BinOp}\mathrel{=}\Conid{AddOp}\mid \Conid{SubOp}\mid \Conid{MultOp}\mid \Conid{DivOp}\mid \Conid{NumEqOp}}$\\
+${}$\\
+${\Varid{decodeOp}\mathrel{=}\Varid{fst}\mathbin{\circ}\Varid{decode}}$\\
+${\Varid{decodeArgs}\mathrel{=}\Varid{snd}\mathbin{\circ}\Varid{decode}}$\\
+${}$\\
+${\Varid{decode}\;(\Conid{Add}\;\Varid{x}\;\Varid{y})\mathrel{=}(\Conid{AddOp},(\Varid{x},\Varid{y}))}$\\
+${\Varid{decode}\;(\Conid{Sub}\;\Varid{x}\;\Varid{y})\mathrel{=}(\Conid{SubOp},(\Varid{x},\Varid{y}))}$\\
+${\Varid{decode}\;(\Conid{Mult}\;\Varid{x}\;\Varid{y})\mathrel{=}(\Conid{MultOp},(\Varid{x},\Varid{y}))}$\\
+${\Varid{decode}\;(\Conid{Div}\;\Varid{x}\;\Varid{y})\mathrel{=}(\Conid{DivOp},(\Varid{x},\Varid{y}))}$\\
+${\Varid{decode}\;(\Conid{NumEq}\;\Varid{x}\;\Varid{y})\mathrel{=}(\Conid{NumEqOp},(\Varid{x},\Varid{y}))}$
+\end{tabbing}
+
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{mkAdd}\mathrel{=}\Varid{mkTerm2}\;\Conid{Add}}$\\
+${\Varid{mkSub}\mathrel{=}\Varid{mkTerm2}\;\Conid{Sub}}$\\
+${\Varid{mkMult}\mathrel{=}\Varid{mkTerm2}\;\Conid{Mult}}$\\
+${\Varid{mkDiv}\mathrel{=}\Varid{mkTerm2}\;\Conid{Div}}$\\
+${\Varid{mkNumEq}\mathrel{=}\Varid{mkTerm2}\;\Conid{NumEq}}$\\
+${\Varid{mkNum}\mathrel{=}\Varid{mkTerm}\;\Conid{Num}}$
+\end{tabbing}
+\subsection{Fixed Point Term}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mbox{\enskip\{-\# OPTIONS -fglasgow-exts -fallow-overlapping-instances -fallow-undecidable-instances -fno-monomorphism-restriction  \#-\}\enskip}}$\\
+${\mathbf{module}\;\Conid{\Conid{InterpreterLib}.\Conid{Terms}.FixTerm}\;\mathbf{where}}$\\
+${}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Algebras}}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Functors}}$
+\end{tabbing}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{FixTerm}\;\Varid{x}\mathrel{=}\Conid{FixTerm}\;\Varid{x}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Functor}\;\Conid{FixTerm}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{FixTerm}\;\Varid{x})\mathrel{=}\Conid{FixTerm}\;(\Varid{f}\;\Varid{x})}$\\
+${}$\\
+${}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{ZipFunctor}\;\Conid{FixTerm}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{FixTerm}\;\Varid{x})\;(\Conid{FixTerm}\;\Varid{y})\mathrel{=}\Varid{return}\;(\Conid{FixTerm}\;(\Varid{f}\;\Varid{x}\;\Varid{y}))}$
+\end{tabbing}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{FixTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{FixTermAlgebra}\{\mskip1.5mu \Varid{fixTerm}\mathbin{::}\Conid{AlgSig}\;\Conid{FixTerm}\;\Varid{a}\mskip1.5mu\}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Algebra}\;\Conid{FixTerm}\;\Conid{FixTermAlgebra}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathrel{=}\Varid{fixTerm}\;\Varid{alg}\;\Varid{t}}$\\
+${}$\\
+${}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{AlgebraBuilder}\;\Conid{FixTerm}\;(\Conid{AlgSig}\;\Conid{FixTerm}\;\Varid{a})\;\Conid{FixTermAlgebra}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{mkAlgebra}\;\Varid{\phi}\mathrel{=}\Conid{FixTermAlgebra}\;\Varid{\phi}}$
+\end{tabbing}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{mkFix}\mathrel{=}\Varid{mkTerm}\;\Conid{FixTerm}}$
+\end{tabbing}
+\subsection{IO Terms}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mbox{\enskip\{-\# OPTIONS -fglasgow-exts -fallow-overlapping-instances -fallow-undecidable-instances -fno-monomorphism-restriction  \#-\}\enskip}}$\\
+${\mathbf{module}\;\Conid{\Conid{InterpreterLib}.\Conid{Terms}.IOTerm}\;\mathbf{where}}$\\
+${}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Algebras}}$\\
+${\mathbf{import}\;\Conid{\Conid{Control}.Monad}\;(\Varid{liftM})}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Functors}}$
+\end{tabbing}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{IOTerm}\;\Varid{a}\mathrel{=}\Conid{WriteIO}\;\Varid{a}}$\\
+${\phantom{\mathbf{data}\;\Conid{IOTerm}\;\Varid{a}\mbox{}}\mid \Conid{ReadIO}}$\\
+${}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Functor}\;\Conid{IOTerm}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{WriteIO}\;\Varid{x})\mathrel{=}\Conid{WriteIO}\;(\Varid{f}\;\Varid{x})}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;\Conid{ReadIO}\mathrel{=}\Conid{ReadIO}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{ZipFunctor}\;\Conid{IOTerm}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{WriteIO}\;\Varid{x})\;(\Conid{WriteIO}\;\Varid{y})\mathrel{=}\Varid{return}\mathbin{\$}\Conid{WriteIO}\;(\Varid{f}\;\Varid{x}\;\Varid{y})}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;\Conid{ReadIO}\;\Conid{ReadIO}\mathrel{=}\Varid{return}\;\Conid{ReadIO}}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\anonymous \;\anonymous \;\anonymous \mathrel{=}\Varid{fail}\;\text{\tt \char34 zipFunctor\char34}}$\\
+${}$\\
+${\mathbf{data}\;\Conid{IOTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{IOTermAlgebra}\{\mskip1.5mu \Varid{writeIOTerm}\mathbin{::}\Conid{IOTerm}\;\Varid{a}\to \Varid{a},}$\\
+${\phantom{\mathbf{data}\;\Conid{IOTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{IOTermAlgebra}\{\mskip1.5mu \mbox{}}\Varid{readIOTerm}\mathbin{::}\Conid{IOTerm}\;\Varid{a}\to \Varid{a}}$\\
+${\phantom{\mathbf{data}\;\Conid{IOTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{IOTermAlgebra}\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Algebra}\;\Conid{IOTerm}\;\Conid{IOTermAlgebra}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{WriteIO}\;\Varid{x})\mathrel{=}\Varid{writeIOTerm}\;\Varid{alg}\;\Varid{t}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}\Conid{ReadIO}\mathrel{=}\Varid{readIOTerm}\;\Varid{alg}\;\Varid{t}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{AlgebraBuilder}\;\Conid{IOTerm}\;(\Conid{IOTerm}\;\Varid{a}\to \Varid{a})\;\Conid{IOTermAlgebra}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{mkAlgebra}\;\Varid{\phi}\mathrel{=}\Conid{IOTermAlgebra}\;\Varid{\phi}\;\Varid{\phi}}$\\
+${}$\\
+${}$\\
+${\Varid{mkWrite}\mathrel{=}\Varid{mkTerm}\;\Conid{WriteIO}}$\\
+${\Varid{mkRead}\mathrel{=}\Varid{mkTerm0}\;\Conid{ReadIO}}$
+\end{tabbing}
+\subsection{If Term}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mbox{\enskip\{-\# OPTIONS -fglasgow-exts -fallow-overlapping-instances -fallow-undecidable-instances -fno-monomorphism-restriction  \#-\}\enskip}}$\\
+${\mathbf{module}\;\Conid{\Conid{InterpreterLib}.\Conid{Terms}.IfTerm}\;\mathbf{where}}$\\
+${}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Algebras}}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Functors}}$
+\end{tabbing}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{IfTerm}\;\Varid{a}\mathrel{=}\Conid{IfTerm}\;\Varid{a}\;\Varid{a}\;\Varid{a}}$\\
+${\phantom{\mathbf{data}\;\Conid{IfTerm}\;\Varid{a}\mbox{}}\mid \Conid{TrueTerm}}$\\
+${\phantom{\mathbf{data}\;\Conid{IfTerm}\;\Varid{a}\mbox{}}\mid \Conid{FalseTerm}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Functor}\;\Conid{IfTerm}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{IfTerm}\;\Varid{x}\;\Varid{y}\;\Varid{z})\mathrel{=}\Conid{IfTerm}\;(\Varid{f}\;\Varid{x})\;(\Varid{f}\;\Varid{y})\;(\Varid{f}\;\Varid{z})}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;\Conid{TrueTerm}\mathrel{=}\Conid{TrueTerm}}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;\Conid{FalseTerm}\mathrel{=}\Conid{FalseTerm}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{ZipFunctor}\;\Conid{IfTerm}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{IfTerm}\;\Varid{a}\;\Varid{b}\;\Varid{c})\;(\Conid{IfTerm}\;\Varid{x}\;\Varid{y}\;\Varid{z})\mathrel{=}\Varid{return}\mathbin{\$}\Conid{IfTerm}\;(\Varid{f}\;\Varid{a}\;\Varid{x})\;(\Varid{f}\;\Varid{b}\;\Varid{y})\;(\Varid{f}\;\Varid{c}\;\Varid{z})}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;\Conid{TrueTerm}\;\Conid{TrueTerm}\mathrel{=}\Varid{return}\;\Conid{TrueTerm}}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;\Conid{FalseTerm}\;\Conid{FalseTerm}\mathrel{=}\Varid{return}\;\Conid{FalseTerm}}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;\anonymous \;\anonymous \mathrel{=}\Varid{fail}\;\text{\tt \char34 ZipFunctor:~Unlike~constructors\char34}}$
+\end{tabbing}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{IfTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{IfTermAlgebra}\{\mskip1.5mu \Varid{ifTerm}\mathbin{::}\Conid{IfTerm}\;\Varid{a}\to \Varid{a},}$\\
+${\phantom{\mathbf{data}\;\Conid{IfTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{IfTermAlgebra}\{\mskip1.5mu \mbox{}}\Varid{trueTerm}\mathbin{::}\Conid{IfTerm}\;\Varid{a}\to \Varid{a},}$\\
+${\phantom{\mathbf{data}\;\Conid{IfTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{IfTermAlgebra}\{\mskip1.5mu \mbox{}}\Varid{falseTerm}\mathbin{::}\Conid{IfTerm}\;\Varid{a}\to \Varid{a}}$\\
+${\phantom{\mathbf{data}\;\Conid{IfTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{IfTermAlgebra}\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Algebra}\;\Conid{IfTerm}\;\Conid{IfTermAlgebra}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{IfTerm}\;\anonymous \;\anonymous \;\anonymous )\mathrel{=}\Varid{ifTerm}\;\Varid{alg}\;\Varid{t}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}\Conid{TrueTerm}\mathrel{=}\Varid{trueTerm}\;\Varid{alg}\;\Varid{t}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}\Conid{FalseTerm}\mathrel{=}\Varid{falseTerm}\;\Varid{alg}\;\Varid{t}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{AlgebraBuilder}\;\Conid{IfTerm}\;(\Conid{IfTerm}\;\Varid{a}\to \Varid{a})\;\Conid{IfTermAlgebra}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{mkAlgebra}\;\Varid{\phi}\mathrel{=}\Conid{IfTermAlgebra}\;\Varid{\phi}\;\Varid{\phi}\;\Varid{\phi}}$\\
+${}$\\
+${}$\\
+${\Varid{mkIf}\mathrel{=}\Varid{mkTerm3}\;\Conid{IfTerm}}$\\
+${\Varid{mkTrue}\mathrel{=}\Varid{mkTerm0}\;\Conid{TrueTerm}}$\\
+${\Varid{mkFalse}\mathrel{=}\Varid{mkTerm0}\;\Conid{FalseTerm}}$
+\end{tabbing}
+\subsection{Reference Terms}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mbox{\enskip\{-\# OPTIONS -fglasgow-exts -fallow-overlapping-instances -fallow-undecidable-instances -fno-monomorphism-restriction  \#-\}\enskip}}$\\
+${\mathbf{module}\;\Conid{\Conid{InterpreterLib}.\Conid{Terms}.ImperativeTerm}\;\mathbf{where}}$\\
+${}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Functors}}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Algebras}}$
+\end{tabbing}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{ImperativeTerm}\;\Varid{x}\mathrel{=}\Conid{NewRef}\;\Varid{x}}$\\
+${\phantom{\mathbf{data}\;\Conid{ImperativeTerm}\;\Varid{x}\mbox{}}\mid \Conid{DeRef}\;\Varid{x}}$\\
+${\phantom{\mathbf{data}\;\Conid{ImperativeTerm}\;\Varid{x}\mbox{}}\mid \Conid{SeqTerm}\;\Varid{x}\;\Varid{x}}$\\
+${}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Functor}\;\Conid{ImperativeTerm}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{NewRef}\;\Varid{x})\mathrel{=}\Conid{NewRef}\;(\Varid{f}\;\Varid{x})}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{DeRef}\;\Varid{x})\mathrel{=}\Conid{DeRef}\;(\Varid{f}\;\Varid{x})}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{SeqTerm}\;\Varid{x}\;\Varid{y})\mathrel{=}\Conid{SeqTerm}\;(\Varid{f}\;\Varid{x})\;(\Varid{f}\;\Varid{y})}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{ZipFunctor}\;\Conid{ImperativeTerm}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{NewRef}\;\Varid{x})\;(\Conid{NewRef}\;\Varid{y})\mathrel{=}\Varid{return}\mathbin{\$}\Conid{NewRef}\;(\Varid{f}\;\Varid{x}\;\Varid{y})}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{DeRef}\;\Varid{x})\;(\Conid{DeRef}\;\Varid{y})\mathrel{=}\Varid{return}\mathbin{\$}\Conid{DeRef}\;(\Varid{f}\;\Varid{x}\;\Varid{y})}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{SeqTerm}\;\Varid{x}\;\Varid{y})\;(\Conid{SeqTerm}\;\Varid{u}\;\Varid{v})\mathrel{=}\Varid{return}\mathbin{\$}\Conid{SeqTerm}\;(\Varid{f}\;\Varid{x}\;\Varid{u})\;(\Varid{f}\;\Varid{y}\;\Varid{v})}$
+\end{tabbing}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{ImperativeTermAlgebra}\;\Varid{a}\mathrel{=}}$\\
+${\hskip2.00em\relax\Conid{ImperativeTermAlgebra}\{\mskip1.5mu \Varid{newRef}\mathbin{::}\Conid{ImperativeTerm}\;\Varid{a}\to \Varid{a},}$\\
+${\hskip2.00em\relax\phantom{\Conid{ImperativeTermAlgebra}\{\mskip1.5mu \mbox{}}\Varid{deRef}\mathbin{::}\Conid{ImperativeTerm}\;\Varid{a}\to \Varid{a},}$\\
+${\hskip2.00em\relax\phantom{\Conid{ImperativeTermAlgebra}\{\mskip1.5mu \mbox{}}\Varid{seqTerm}\mathbin{::}\Conid{ImperativeTerm}\;\Varid{a}\to \Varid{a}}$\\
+${\hskip2.00em\relax\phantom{\Conid{ImperativeTermAlgebra}\mbox{}}\mskip1.5mu\}}$
+\end{tabbing}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{instance}\;\Conid{Algebra}\;\Conid{ImperativeTerm}\;\Conid{ImperativeTermAlgebra}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{NewRef}\;\anonymous )\mathrel{=}\Varid{newRef}\;\Varid{alg}\;\Varid{t}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{DeRef}\;\anonymous )\mathrel{=}\Varid{deRef}\;\Varid{alg}\;\Varid{t}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{SeqTerm}\;\anonymous \;\anonymous )\mathrel{=}\Varid{seqTerm}\;\Varid{alg}\;\Varid{t}}$\\
+${}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{AlgebraBuilder}\;\Conid{ImperativeTerm}\;}$\\
+${\phantom{\mathbf{instance}\;\Conid{AlgebraBuilder}\;\mbox{}}(\Conid{ImperativeTerm}\;\Varid{a}\to \Varid{a})\;}$\\
+${\phantom{\mathbf{instance}\;\Conid{AlgebraBuilder}\;\mbox{}}\Conid{ImperativeTermAlgebra}\;\Varid{a}\;\mathbf{where}}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{mkAlgebra}\;\Varid{f}\mathrel{=}\Conid{ImperativeTermAlgebra}\;\Varid{f}\;\Varid{f}\;\Varid{f}}$
+\end{tabbing}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{mkNewRef}\mathrel{=}\Varid{mkTerm}\;\Conid{NewRef}}$\\
+${\Varid{mkDeRef}\mathrel{=}\Varid{mkTerm}\;\Conid{DeRef}}$\\
+${\Varid{mkSeqTerm}\mathrel{=}\Varid{mkTerm2}\;\Conid{SeqTerm}}$
+\end{tabbing}
+\subsection{Lambda Terms}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mbox{\enskip\{-\# OPTIONS -fglasgow-exts -fallow-overlapping-instances -fallow-undecidable-instances -fno-monomorphism-restriction  \#-\}\enskip}}$\\
+${\mathbf{module}\;\Conid{\Conid{InterpreterLib}.\Conid{Terms}.LambdaTerm}\;(\Conid{LambdaTerm}\;(\mathinner{\ldotp\ldotp}),}$\\
+${\phantom{\mathbf{module}\;\Conid{\Conid{InterpreterLib}.\Conid{Terms}.LambdaTerm}\;(\mbox{}}\Conid{LambdaTermAlgebra}\;(\mathinner{\ldotp\ldotp}),}$\\
+${\phantom{\mathbf{module}\;\Conid{\Conid{InterpreterLib}.\Conid{Terms}.LambdaTerm}\;(\mbox{}}\Conid{LambdaTermModule},\Varid{lambdaModule})\;\mathbf{where}}$\\
+${}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Algebras}}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Functors}}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Modules}}$
+\end{tabbing}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{LambdaTerm}\;\Varid{ty}\;\Varid{x}\mathrel{=}\Conid{App}\;\Varid{x}\;\Varid{x}}$\\
+${\phantom{\mathbf{data}\;\Conid{LambdaTerm}\;\Varid{ty}\;\Varid{x}\mbox{}}\mid \Conid{Lam}\;\Conid{String}\;\Varid{ty}\;\Varid{x}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Functor}\;(\Conid{LambdaTerm}\;\Varid{ty})\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{App}\;\Varid{x}\;\Varid{y})\mathrel{=}\Conid{App}\;(\Varid{f}\;\Varid{x})\;(\Varid{f}\;\Varid{y})}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{Lam}\;\Varid{s}\;\Varid{ty}\;\Varid{x})\mathrel{=}\Conid{Lam}\;\Varid{s}\;\Varid{ty}\;(\Varid{f}\;\Varid{x})}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{ZipFunctor}\;(\Conid{LambdaTerm}\;\Varid{ty})\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{App}\;\Varid{a}\;\Varid{b})\;(\Conid{App}\;\Varid{x}\;\Varid{y})\mathrel{=}\Varid{return}\mathbin{\$}\Conid{App}\;(\Varid{f}\;\Varid{a}\;\Varid{x})\;(\Varid{f}\;\Varid{b}\;\Varid{y})}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{Lam}\;\Varid{n}\;\Varid{ty}\;\Varid{x})\;(\Conid{Lam}\;\anonymous \;\anonymous \;\Varid{y})\mathrel{=}\Varid{return}\mathbin{\$}\Conid{Lam}\;\Varid{n}\;\Varid{ty}\;(\Varid{f}\;\Varid{x}\;\Varid{y})}$\\
+${}$\\
+${}$\\
+${\mathbf{data}\;\Conid{LambdaTermAlgebra}\;\Varid{ty}\;\Varid{a}\mathrel{=}\Conid{LambdaTermAlgebra}\{\mskip1.5mu \Varid{app}\mathbin{::}\Conid{LambdaTerm}\;\Varid{ty}\;\Varid{a}\to \Varid{a},}$\\
+${\phantom{\mathbf{data}\;\Conid{LambdaTermAlgebra}\;\Varid{ty}\;\Varid{a}\mathrel{=}\Conid{LambdaTermAlgebra}\{\mskip1.5mu \mbox{}}\Varid{lam}\mathbin{::}\Conid{LambdaTerm}\;\Varid{ty}\;\Varid{a}\to \Varid{a}}$\\
+${\phantom{\mathbf{data}\;\Conid{LambdaTermAlgebra}\;\Varid{ty}\;\Varid{a}\mathrel{=}\Conid{LambdaTermAlgebra}\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Algebra}\;(\Conid{LambdaTerm}\;\Varid{ty})\;(\Conid{LambdaTermAlgebra}\;\Varid{ty})\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{App}\;\anonymous \;\anonymous )\mathrel{=}\Varid{app}\;\Varid{alg}\;\Varid{t}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{Lam}\;\anonymous \;\anonymous \;\anonymous )\mathrel{=}\Varid{lam}\;\Varid{alg}\;\Varid{t}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{AlgebraBuilder}\;(\Conid{LambdaTerm}\;\Varid{ty})\;(\Conid{LambdaTerm}\;\Varid{ty}\;\Varid{a}\to \Varid{a})\;(\Conid{LambdaTermAlgebra}\;\Varid{ty})\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{mkAlgebra}\;\Varid{f}\mathrel{=}\Conid{LambdaTermAlgebra}\;\Varid{f}\;\Varid{f}}$
+\end{tabbing}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mbox{\enskip\{- 
+data LambdaTermModule ty tm =
+  LambdaTermModule  { lambdaConstructor :: String -> ty -> tm -> LambdaTerm ty tm,
+                      appConstructor ::  tm -> tm -> LambdaTerm ty tm
+                    } -\}\enskip}}$\\
+${}$\\
+${}$\\
+${}$\\
+${}$\\
+${}$\\
+${}$\\
+${\mathbf{data}\;\Conid{LTMI}\;\Varid{ty}\;\Varid{tm}\mathrel{=}}$\\
+${\hskip1.00em\relax\Conid{LTMI}\{\mskip1.5mu \Varid{lc}\mathbin{::}\Conid{String}\to \Varid{ty}\to \Varid{tm}\to \Conid{LambdaTerm}\;\Varid{ty}\;\Varid{tm},}$\\
+${\hskip1.00em\relax\phantom{\Conid{LTMI}\{\mskip1.5mu \mbox{}}\Varid{ac}\mathbin{::}\Varid{tm}\to \Varid{tm}\to \Conid{LambdaTerm}\;\Varid{ty}\;\Varid{tm}}$\\
+${\hskip1.00em\relax\phantom{\Conid{LTMI}\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${}$\\
+${\mathbf{data}\;\Conid{LambdaTermModule}\;\Varid{ty}\;\Varid{tm}\mathrel{=}}$\\
+${\hskip1.00em\relax\Conid{LambdaTermModule}\{\mskip1.5mu \Varid{getMkLambda}\mathbin{::}\Conid{String}\to \Varid{ty}\to \Varid{tm}\to \Varid{tm},}$\\
+${\hskip1.00em\relax\phantom{\Conid{LambdaTermModule}\{\mskip1.5mu \mbox{}}\Varid{getMkApp}\mathbin{::}\Varid{tm}\to \Varid{tm}\to \Varid{tm}}$\\
+${\hskip1.00em\relax\phantom{\Conid{LambdaTermModule}\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${}$\\
+${\Varid{mkModule}\;(\Varid{x}\mathbin{::}\Varid{ty})\;(\Varid{y}\mathbin{::}\Varid{tm})\mathrel{=}\mathbf{let}\;\Varid{mod}\mathbin{::}\Conid{LTMI}\;\Varid{ty}\;\Varid{tm}}$\\
+${\phantom{\Varid{mkModule}\;(\Varid{x}\mathbin{::}\Varid{ty})\;(\Varid{y}\mathbin{::}\Varid{tm})\mathrel{=}\mathbf{let}\;\mbox{}}\Varid{mod}\mathrel{=}\Conid{LTMI}\;\Conid{Lam}\;\Conid{App}}$\\
+${\phantom{\Varid{mkModule}\;(\Varid{x}\mathbin{::}\Varid{ty})\;(\Varid{y}\mathbin{::}\Varid{tm})\mathrel{=}\mbox{}}\mathbf{in}\;\Conid{LambdaTermModule}\;(\Varid{mkTerm3}\mathbin{\$}\Varid{lc}\;\Varid{mod})\;(\Varid{mkTerm2}\mathbin{\$}\Varid{ac}\;\Varid{mod})}$\\
+${}$\\
+${\Varid{lambdaModule}\mathrel{=}\Varid{mkModule}\;\bot \;\bot }$\\
+${}$\\
+${}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Module}\;(\Conid{LambdaTermModule}\;\Varid{ty}\;\Varid{tm})\;(\Conid{String}\to \Varid{ty}\to \Varid{tm}\to \Varid{tm},}$\\
+${\phantom{\mathbf{instance}\;\Conid{Module}\;(\Conid{LambdaTermModule}\;\Varid{ty}\;\Varid{tm})\;(\mbox{}}\Varid{tm}\to \Varid{tm}\to \Varid{tm})\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{open}\;(\Conid{LambdaTermModule}\;\Varid{l}\;\Varid{a})\mathrel{=}(\Varid{l},\Varid{a})}$
+\end{tabbing}
+\subsection{Let Term}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mbox{\enskip\{-\# OPTIONS -fglasgow-exts -fallow-overlapping-instances -fallow-undecidable-instances -fno-monomorphism-restriction  \#-\}\enskip}}$\\
+${\mathbf{module}\;\Conid{\Conid{InterpreterLib}.\Conid{Terms}.LetTerm}\;\mathbf{where}}$\\
+${}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Algebras}}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Functors}}$
+\end{tabbing}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{type}\;\Conid{Name}\mathrel{=}\Conid{String}}$\\
+${\mathbf{data}\;\Conid{LetTerm}\;\Varid{ty}\;\Varid{a}\mathrel{=}\Conid{LetTerm}\;[\mskip1.5mu (\Conid{Name},\Varid{ty},\Varid{a})\mskip1.5mu]\;\Varid{a}}$\\
+${\phantom{\mathbf{data}\;\Conid{LetTerm}\;\Varid{ty}\;\Varid{a}\mbox{}}\mid \Conid{LetRecTerm}\;[\mskip1.5mu (\Conid{Name},\Varid{ty},\Varid{a})\mskip1.5mu]\;\Varid{a}}$\\
+${}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Functor}\;(\Conid{LetTerm}\;\Varid{ty})\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{LetTerm}\;\Varid{bindings}\;\Varid{body})\mathrel{=}\Conid{LetTerm}\;(\Varid{map}\;(\lambda (\Varid{n},\Varid{ty},\Varid{v})\to (\Varid{n},\Varid{ty},\Varid{f}\;\Varid{v}))\;\Varid{bindings})\;(\Varid{f}\;\Varid{body})}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{LetRecTerm}\;\Varid{bindings}\;\Varid{body})\mathrel{=}\Conid{LetRecTerm}\;(\Varid{map}\;(\lambda (\Varid{n},\Varid{ty},\Varid{v})\to (\Varid{n},\Varid{ty},\Varid{f}\;\Varid{v}))\;\Varid{bindings})\;(\Varid{f}\;\Varid{body})}$\\
+${}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{ZipFunctor}\;(\Conid{LetTerm}\;\Varid{ty})\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{LetTerm}\;\Varid{bs1}\;\Varid{b1})\;(\Conid{LetTerm}\;\Varid{bs2}\;\Varid{b2})\mathrel{=}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{return}\mathbin{\$}\Conid{LetTerm}\;(\Varid{zipWith}\;\Varid{fun}\;\Varid{bs1}\;\Varid{bs2})\;(\Varid{f}\;\Varid{b1}\;\Varid{b2})}$\\
+${\hskip1.00em\relax\hskip1.00em\relax\mathbf{where}\;\Varid{fun}\;(\Varid{n1},\Varid{ty},\Varid{v1})\;(\Varid{n2},\anonymous ,\Varid{v2})\mathrel{=}(\Varid{n1},\Varid{ty},(\Varid{f}\;\Varid{v1}\;\Varid{v2}))}$\\
+${}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{LetRecTerm}\;\Varid{bs1}\;\Varid{b1})\;(\Conid{LetRecTerm}\;\Varid{bs2}\;\Varid{b2})\mathrel{=}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{return}\mathbin{\$}\Conid{LetRecTerm}\;(\Varid{zipWith}\;\Varid{fun}\;\Varid{bs1}\;\Varid{bs2})\;(\Varid{f}\;\Varid{b1}\;\Varid{b2})}$\\
+${\hskip1.00em\relax\hskip1.00em\relax\mathbf{where}\;\Varid{fun}\;(\Varid{n1},\Varid{ty},\Varid{v1})\;(\Varid{n2},\anonymous ,\Varid{v2})\mathrel{=}(\Varid{n1},\Varid{ty},(\Varid{f}\;\Varid{v1}\;\Varid{v2}))}$\\
+${}$\\
+${\mathbf{data}\;\Conid{LetTermAlgebra}\;\Varid{ty}\;\Varid{a}\mathrel{=}\Conid{LetTermAlgebra}\{\mskip1.5mu \Varid{letTerm}\mathbin{::}\Conid{AlgSig}\;(\Conid{LetTerm}\;\Varid{ty})\;\Varid{a},}$\\
+${\phantom{\mathbf{data}\;\Conid{LetTermAlgebra}\;\Varid{ty}\;\Varid{a}\mathrel{=}\Conid{LetTermAlgebra}\{\mskip1.5mu \mbox{}}\Varid{letRecTerm}\mathbin{::}\Conid{AlgSig}\;(\Conid{LetTerm}\;\Varid{ty})\;\Varid{a}}$\\
+${\phantom{\mathbf{data}\;\Conid{LetTermAlgebra}\;\Varid{ty}\;\Varid{a}\mathrel{=}\Conid{LetTermAlgebra}\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Algebra}\;(\Conid{LetTerm}\;\Varid{ty})\;(\Conid{LetTermAlgebra}\;\Varid{ty})\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{LetTerm}\;\anonymous \;\anonymous )\mathrel{=}\Varid{letTerm}\;\Varid{alg}\;\Varid{t}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{LetRecTerm}\;\anonymous \;\anonymous )\mathrel{=}\Varid{letRecTerm}\;\Varid{alg}\;\Varid{t}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{AlgebraBuilder}\;(\Conid{LetTerm}\;\Varid{ty})\;(\Conid{LetTerm}\;\Varid{ty}\;\Varid{a}\to \Varid{a})\;(\Conid{LetTermAlgebra}\;\Varid{ty})\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{mkAlgebra}\;\Varid{\phi}\mathrel{=}\Conid{LetTermAlgebra}\;\Varid{\phi}\;\Varid{\phi}}$\\
+${}$\\
+${\Varid{mkLet}\mathrel{=}\Varid{mkTerm2}\;\Conid{LetTerm}}$\\
+${\Varid{mkLetRec}\mathrel{=}\Varid{mkTerm2}\;\Conid{LetRecTerm}}$
+\end{tabbing}
+\subsection{Procedure Term}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mbox{\enskip\{-\# OPTIONS -fglasgow-exts -fallow-overlapping-instances -fallow-undecidable-instances -fno-monomorphism-restriction  \#-\}\enskip}}$\\
+${\mathbf{module}\;\Conid{\Conid{InterpreterLib}.\Conid{Terms}.ProcTerm}\;\mathbf{where}}$\\
+${}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Algebras}}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Functors}}$
+\end{tabbing}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{type}\;\Conid{Name}\mathrel{=}\Conid{String}}$\\
+${\mathbf{data}\;\Conid{ProcTerm}\;\Varid{x}\mathrel{=}\Conid{Procedure}\;\Conid{Name}\;[\mskip1.5mu \Conid{Name}\mskip1.5mu]\;\Varid{x}\mid }$\\
+${\phantom{\mathbf{data}\;\Conid{ProcTerm}\;\Varid{x}\mathrel{=}\mbox{}}\Conid{ProcCall}\;\Varid{x}\;[\mskip1.5mu \Varid{x}\mskip1.5mu]}$\\
+${}$\\
+${\mathbf{newtype}\;\Conid{ProcValue}\;\Varid{v}\mathrel{=}\Conid{ProcValue}\;([\mskip1.5mu \Varid{v}\mskip1.5mu]\to \Varid{v})}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Functor}\;\Conid{ProcTerm}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{Procedure}\;\Varid{procname}\;\Varid{ns}\;\Varid{body})\mathrel{=}\Conid{Procedure}\;\Varid{procname}\;\Varid{ns}\;(\Varid{f}\;\Varid{body})}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{ProcCall}\;\Varid{fun}\;\Varid{args})\mathrel{=}\Conid{ProcCall}\;(\Varid{f}\;\Varid{fun})\;(\Varid{map}\;\Varid{f}\;\Varid{args})}$\\
+${}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{ZipFunctor}\;\Conid{ProcTerm}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{Procedure}\;\Varid{m}\;\Varid{ms}\;\Varid{b1})\;(\Conid{Procedure}\;\Varid{n}\;\Varid{ns}\;\Varid{b2})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\mid \Varid{m}\equiv \Varid{n}\mathrel{\wedge}\Varid{ms}\equiv \Varid{ns}\mathrel{=}\Varid{return}\mathbin{\$}\Conid{Procedure}\;\Varid{m}\;\Varid{ms}\;(\Varid{f}\;\Varid{b1}\;\Varid{b2})}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\mid \Varid{otherwise}\mathrel{=}\Varid{fail}\;\text{\tt \char34 zipFunctor\char34}}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{ProcCall}\;\Varid{f1}\;\Varid{a1})\;(\Conid{ProcCall}\;\Varid{f2}\;\Varid{a2})\mathrel{=}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{return}\mathbin{\$}\Conid{ProcCall}\;(\Varid{f}\;\Varid{f1}\;\Varid{f2})\;(\Varid{zipWith}\;\Varid{f}\;\Varid{a1}\;\Varid{a2})}$\\
+${}$\\
+${\mathbf{data}\;\Conid{ProcTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{ProcTermAlgebra}\{\mskip1.5mu \Varid{procTerm}\mathbin{::}\Conid{ProcTerm}\;\Varid{a}\to \Varid{a},}$\\
+${\phantom{\mathbf{data}\;\Conid{ProcTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{ProcTermAlgebra}\{\mskip1.5mu \mbox{}}\Varid{callTerm}\mathbin{::}\Conid{ProcTerm}\;\Varid{a}\to \Varid{a}}$\\
+${\phantom{\mathbf{data}\;\Conid{ProcTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{ProcTermAlgebra}\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Algebra}\;\Conid{ProcTerm}\;\Conid{ProcTermAlgebra}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{Procedure}\;\anonymous \;\anonymous \;\anonymous )\mathrel{=}(\Varid{procTerm}\;\Varid{alg})\;\Varid{t}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{ProcCall}\;\anonymous \;\anonymous )\mathrel{=}(\Varid{callTerm}\;\Varid{alg})\;\Varid{t}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{AlgebraBuilder}\;\Conid{ProcTerm}\;(\Conid{ProcTerm}\;\Varid{a}\to \Varid{a})\;\Conid{ProcTermAlgebra}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{mkAlgebra}\;\Varid{f}\mathrel{=}\Conid{ProcTermAlgebra}\;\Varid{f}\;\Varid{f}}$\\
+${}$\\
+${}$\\
+${}$\\
+${\Varid{mkProc}\mathrel{=}\Varid{mkTerm3}\;\Conid{Procedure}}$\\
+${\Varid{mkCall}\mathrel{=}\Varid{mkTerm2}\;\Conid{ProcCall}}$
+\end{tabbing}
+\subsection{RAL Term}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mbox{\enskip\{-\# OPTIONS -fglasgow-exts -fallow-overlapping-instances -fallow-undecidable-instances -fno-monomorphism-restriction  \#-\}\enskip}}$\\
+${\mathbf{module}\;\Conid{\Conid{InterpreterLib}.\Conid{Terms}.RALTerm}\;\mathbf{where}}$\\
+${}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Algebras}}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Functors}}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.\Conid{Terms}.VarTerm}}$
+\end{tabbing}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{type}\;\Conid{RegionVar}\mathrel{=}\Conid{String}}$\\
+${\mathbf{data}\;\Conid{Place}\mathrel{=}\Conid{RegionVar}\mid \Conid{Deallocated}}$\\
+${\mathbf{data}\;\Conid{RALTerm}\;\Varid{x}\mathrel{=}\Conid{RApp}\;\Varid{x}\;\Conid{Place}}$\\
+${\phantom{\mathbf{data}\;\Conid{RALTerm}\;\Varid{x}\mbox{}}\mid \Conid{NewRegion}\;\Conid{RegionVar}\;\Varid{x}}$\\
+${\phantom{\mathbf{data}\;\Conid{RALTerm}\;\Varid{x}\mbox{}}\mid \Conid{RegionAbs}\;\Conid{RegionVar}\;\Varid{x}}$\\
+${\phantom{\mathbf{data}\;\Conid{RALTerm}\;\Varid{x}\mbox{}}\mid \Conid{At}\;\Varid{x}\;\Conid{Place}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Functor}\;\Conid{RALTerm}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{RApp}\;\Varid{x}\;\Varid{place})\mathrel{=}\Conid{RApp}\;(\Varid{f}\;\Varid{x})\;\Varid{place}}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{NewRegion}\;\Varid{v}\;\Varid{x})\mathrel{=}\Conid{NewRegion}\;\Varid{v}\;(\Varid{f}\;\Varid{x})}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{RegionAbs}\;\Varid{v}\;\Varid{x})\mathrel{=}\Conid{RegionAbs}\;\Varid{v}\;(\Varid{f}\;\Varid{x})}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{At}\;\Varid{x}\;\Varid{place})\mathrel{=}\Conid{At}\;(\Varid{f}\;\Varid{x})\;\Varid{place}}$\\
+${}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{ZipFunctor}\;\Conid{RALTerm}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{RApp}\;\Varid{x}\;\Varid{place})\;(\Conid{RApp}\;\Varid{y}\;\anonymous )\mathrel{=}\Varid{return}\mathbin{\$}\Conid{RApp}\;(\Varid{f}\;\Varid{x}\;\Varid{y})\;\Varid{place}}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{NewRegion}\;\Varid{v}\;\Varid{x})\;(\Conid{NewRegion}\;\anonymous \;\Varid{y})\mathrel{=}\Varid{return}\mathbin{\$}\Conid{NewRegion}\;\Varid{v}\;(\Varid{f}\;\Varid{x}\;\Varid{y})}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{RegionAbs}\;\Varid{v}\;\Varid{x})\;(\Conid{RegionAbs}\;\anonymous \;\Varid{y})\mathrel{=}\Varid{return}\mathbin{\$}\Conid{RegionAbs}\;\Varid{v}\;(\Varid{f}\;\Varid{x}\;\Varid{y})}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{At}\;\Varid{x}\;\Varid{place})\;(\Conid{At}\;\Varid{y}\;\anonymous )\mathrel{=}\Varid{return}\mathbin{\$}\Conid{At}\;(\Varid{f}\;\Varid{x}\;\Varid{y})\;\Varid{place}}$
+\end{tabbing}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{RALTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{RALTermAlgebra}\{\mskip1.5mu \Varid{rApp}\mathbin{::}\Conid{RALTerm}\;\Varid{a}\to \Varid{a},}$\\
+${\phantom{\mathbf{data}\;\Conid{RALTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{RALTermAlgebra}\{\mskip1.5mu \mbox{}}\Varid{newRegion}\mathbin{::}\Conid{RALTerm}\;\Varid{a}\to \Varid{a},}$\\
+${\phantom{\mathbf{data}\;\Conid{RALTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{RALTermAlgebra}\{\mskip1.5mu \mbox{}}\Varid{regionAbs}\mathbin{::}\Conid{RALTerm}\;\Varid{a}\to \Varid{a},}$\\
+${\phantom{\mathbf{data}\;\Conid{RALTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{RALTermAlgebra}\{\mskip1.5mu \mbox{}}\Varid{at}\mathbin{::}\Conid{RALTerm}\;\Varid{a}\to \Varid{a}}$\\
+${\phantom{\mathbf{data}\;\Conid{RALTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{RALTermAlgebra}\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Algebra}\;\Conid{RALTerm}\;\Conid{RALTermAlgebra}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{RApp}\;\anonymous \;\anonymous )\mathrel{=}\Varid{rApp}\;\Varid{alg}\;\Varid{t}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{NewRegion}\;\anonymous \;\anonymous )\mathrel{=}\Varid{newRegion}\;\Varid{alg}\;\Varid{t}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{RegionAbs}\;\anonymous \;\anonymous )\mathrel{=}\Varid{regionAbs}\;\Varid{alg}\;\Varid{t}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{At}\;\anonymous \;\anonymous )\mathrel{=}\Varid{at}\;\Varid{alg}\;\Varid{t}}$\\
+${}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{AlgebraBuilder}\;\Conid{RALTerm}\;(\Conid{RALTerm}\;\Varid{a}\to \Varid{a})\;\Conid{RALTermAlgebra}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{mkAlgebra}\;\Varid{\phi}\mathrel{=}\Conid{RALTermAlgebra}\;\Varid{\phi}\;\Varid{\phi}\;\Varid{\phi}\;\Varid{\phi}}$
+\end{tabbing}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mbox{\qquad-{}-  mkRApp t place = inn $ injF $ RApp t place}}$\\
+${\Varid{mkRApp}\mathrel{=}\Varid{mkTerm2}\;\Conid{RApp}}$\\
+${\Varid{mkNewRegion}\mathrel{=}\Varid{mkTerm2}\;\Conid{NewRegion}}$\\
+${\Varid{mkRegionAbs}\mathrel{=}\Varid{mkTerm2}\;\Conid{RegionAbs}}$\\
+${\Varid{mkAt}\mathrel{=}\Varid{mkTerm2}\;\Conid{At}}$
+\end{tabbing}
+\subsection{Record Terms}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mbox{\enskip\{-\# OPTIONS -fglasgow-exts -fallow-overlapping-instances -fallow-undecidable-instances -fno-monomorphism-restriction  \#-\}\enskip}}$\\
+${\mathbf{module}\;\Conid{\Conid{InterpreterLib}.\Conid{Terms}.RecordTerm}\;\mathbf{where}}$\\
+${}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Algebras}}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Functors}}$
+\end{tabbing}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{RecordTerm}\;\Varid{x}\mathrel{=}\Conid{RecordTerm}\;[\mskip1.5mu \Varid{x}\mskip1.5mu]}$\\
+${\phantom{\mathbf{data}\;\Conid{RecordTerm}\;\Varid{x}\mbox{}}\mid \Conid{ProjTerm}\;\Varid{x}\;\Conid{Int}}$\\
+${}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Functor}\;\Conid{RecordTerm}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{RecordTerm}\;\Varid{fields})\mathrel{=}\Conid{RecordTerm}\;(\Varid{fmap}\;\Varid{f}\;\Varid{fields})}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{ProjTerm}\;\Varid{x}\;\Varid{field})\mathrel{=}\Conid{ProjTerm}\;(\Varid{f}\;\Varid{x})\;\Varid{field}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{ZipFunctor}\;\Conid{RecordTerm}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{RecordTerm}\;\Varid{fields})\;(\Conid{RecordTerm}\;\Varid{fields'})\mathrel{=}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{return}\;(\Conid{RecordTerm}\;(\Varid{zipWith}\;\Varid{f}\;\Varid{fields}\;\Varid{fields'}))}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{ProjTerm}\;\Varid{x}\;\Varid{l})\;(\Conid{ProjTerm}\;\Varid{y}\;\Varid{l'})\mid \Varid{l}\equiv \Varid{l'}\mathrel{=}\Varid{return}\;(\Conid{ProjTerm}\;(\Varid{f}\;\Varid{x}\;\Varid{y})\;\Varid{l})}$\\
+${\hskip1.00em\relax\hskip18.00em\relax\mid \Varid{otherwise}\mathrel{=}\Varid{fail}\;\text{\tt \char34 Field~labels~don't~match\char34}}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;\anonymous \;\anonymous \mathrel{=}\Varid{fail}\;\text{\tt \char34 ZipFunctor:~Unlike~constructors\char34}}$
+\end{tabbing}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{RecordTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{RecordTermAlgebra}\{\mskip1.5mu \Varid{recordTerm}\mathbin{::}\Conid{AlgSig}\;\Conid{RecordTerm}\;\Varid{a},}$\\
+${\phantom{\mathbf{data}\;\Conid{RecordTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{RecordTermAlgebra}\{\mskip1.5mu \mbox{}}\Varid{projTerm}\mathbin{::}\Conid{AlgSig}\;\Conid{RecordTerm}\;\Varid{a}\mskip1.5mu\}}$\\
+${}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Algebra}\;\Conid{RecordTerm}\;\Conid{RecordTermAlgebra}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{RecordTerm}\;\anonymous )\mathrel{=}\Varid{recordTerm}\;\Varid{alg}\;\Varid{t}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{ProjTerm}\;\anonymous \;\anonymous )\mathrel{=}\Varid{projTerm}\;\Varid{alg}\;\Varid{t}}$\\
+${}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{AlgebraBuilder}\;\Conid{RecordTerm}\;(\Conid{AlgSig}\;\Conid{RecordTerm}\;\Varid{a})\;\Conid{RecordTermAlgebra}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{mkAlgebra}\;\Varid{\phi}\mathrel{=}\Conid{RecordTermAlgebra}\;\Varid{\phi}\;\Varid{\phi}}$
+\end{tabbing}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{mkRecord}\mathrel{=}\Varid{mkTerm}\;\Conid{RecordTerm}}$\\
+${\Varid{mkProj}\mathrel{=}\Varid{mkTerm2}\;\Conid{ProjTerm}}$
+\end{tabbing}
+\subsection{String Terms}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mbox{\enskip\{-\# OPTIONS -fglasgow-exts -fallow-overlapping-instances -fallow-undecidable-instances -fno-monomorphism-restriction  \#-\}\enskip}}$\\
+${\mathbf{module}\;\Conid{\Conid{InterpreterLib}.\Conid{Terms}.StringTerm}\;\mathbf{where}}$\\
+${}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Algebras}}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Functors}}$
+\end{tabbing}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{StringTerm}\;\Varid{a}\mathrel{=}\Conid{StringTerm}\;\Conid{String}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Functor}\;\Conid{StringTerm}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{StringTerm}\;\Varid{s})\mathrel{=}(\Conid{StringTerm}\;\Varid{s})}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{ZipFunctor}\;\Conid{StringTerm}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{StringTerm}\;\Varid{x})\;(\Conid{StringTerm}\;\Varid{y})\mid \Varid{x}\equiv \Varid{y}\mathrel{=}\Varid{return}\mathbin{\$}\Conid{StringTerm}\;\Varid{x}}$\\
+${\hskip1.00em\relax\phantom{\Varid{zipFunctor}\;\Varid{f}\;(\Conid{StringTerm}\;\Varid{x})\;(\Conid{StringTerm}\;\Varid{y})\mbox{}}\mid \Varid{otherwise}\mathrel{=}\Varid{fail}\;\text{\tt \char34 zipFunctor\char34}}$\\
+${}$\\
+${}$\\
+${\mathbf{data}\;\Conid{StringTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{StringTermAlgebra}\{\mskip1.5mu \Varid{stringTerm}\mathbin{::}\Conid{StringTerm}\;\Varid{a}\to \Varid{a}\mskip1.5mu\}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Algebra}\;\Conid{StringTerm}\;\Conid{StringTermAlgebra}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{StringTerm}\;\anonymous )\mathrel{=}\Varid{stringTerm}\;\Varid{alg}\;\Varid{t}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{AlgebraBuilder}\;\Conid{StringTerm}\;(\Conid{StringTerm}\;\Varid{a}\to \Varid{a})\;\Conid{StringTermAlgebra}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{mkAlgebra}\;\Varid{\phi}\mathrel{=}\Conid{StringTermAlgebra}\;\Varid{\phi}}$\\
+${}$\\
+${}$\\
+${\Varid{mkString}\mathrel{=}\Varid{mkTerm}\;\Conid{StringTerm}}$
+\end{tabbing}
+\subsection{Sum Terms}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mbox{\enskip\{-\# OPTIONS -fglasgow-exts -fallow-overlapping-instances -fallow-undecidable-instances -fno-monomorphism-restriction  \#-\}\enskip}}$\\
+${\mathbf{module}\;\Conid{\Conid{InterpreterLib}.\Conid{Terms}.SumTerm}\;(\Conid{SumTerm}\;(\mathinner{\ldotp\ldotp}),}$\\
+${\phantom{\mathbf{module}\;\Conid{\Conid{InterpreterLib}.\Conid{Terms}.SumTerm}\;(\mbox{}}\Conid{SumTermModule},\Varid{sumModule})\;\mathbf{where}}$\\
+${}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Algebras}}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Functors}}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Modules}}$
+\end{tabbing}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{SumTerm}\;\Varid{ty}\;\Varid{x}\mathrel{=}\Conid{SumLeft}\;\Varid{x}\;\Varid{ty}}$\\
+${\phantom{\mathbf{data}\;\Conid{SumTerm}\;\Varid{ty}\;\Varid{x}\mbox{}}\mid \Conid{SumRight}\;\Varid{x}\;\Varid{ty}}$\\
+${\phantom{\mathbf{data}\;\Conid{SumTerm}\;\Varid{ty}\;\Varid{x}\mbox{}}\mid \Conid{SumCase}\;\Varid{x}\;(\Conid{String},\Varid{x})\;(\Conid{String},\Varid{x})}$\\
+${}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Functor}\;(\Conid{SumTerm}\;\Varid{ty})\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{SumLeft}\;\Varid{x}\;\Varid{ty})\mathrel{=}\Conid{SumLeft}\;(\Varid{f}\;\Varid{x})\;\Varid{ty}}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{SumRight}\;\Varid{x}\;\Varid{ty})\mathrel{=}\Conid{SumRight}\;(\Varid{f}\;\Varid{x})\;\Varid{ty}}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{SumCase}\;\Varid{x}\;(\Varid{v1},\Varid{y})\;(\Varid{v2},\Varid{z}))\mathrel{=}\Conid{SumCase}\;(\Varid{f}\;\Varid{x})\;(\Varid{v1},(\Varid{f}\;\Varid{y}))\;(\Varid{v2},(\Varid{f}\;\Varid{z}))}$\\
+${}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{ZipFunctor}\;(\Conid{SumTerm}\;\Varid{ty})\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{SumLeft}\;\Varid{x}\;\Varid{ty})\;(\Conid{SumLeft}\;\Varid{y}\;\Varid{ty'})\mathrel{=}\Varid{return}\;(\Conid{SumLeft}\;(\Varid{f}\;\Varid{x}\;\Varid{y})\;\Varid{ty})}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{SumRight}\;\Varid{x}\;\Varid{ty})\;(\Conid{SumRight}\;\Varid{y}\;\Varid{ty'})\mathrel{=}\Varid{return}\;(\Conid{SumRight}\;(\Varid{f}\;\Varid{x}\;\Varid{y})\;\Varid{ty})}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;(\Conid{SumCase}\;\Varid{x}\;(\Varid{v1},\Varid{y})\;(\Varid{v2},\Varid{z}))\;(\Conid{SumCase}\;\Varid{x'}\;(\anonymous ,\Varid{y'})\;(\anonymous ,\Varid{z'}))\mathrel{=}}$\\
+${\hskip1.00em\relax\hskip2.00em\relax\Varid{return}\;(\Conid{SumCase}\;(\Varid{f}\;\Varid{x}\;\Varid{x'})\;(\Varid{v1},(\Varid{f}\;\Varid{y}\;\Varid{y'}))\;(\Varid{v2},(\Varid{f}\;\Varid{z}\;\Varid{z'})))}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;\anonymous \;\anonymous \mathrel{=}\Varid{fail}\;\text{\tt \char34 ZipFunctor:~Unlike~constructors\char34}}$
+\end{tabbing}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{SumTermAlgebra}\;\Varid{ty}\;\Varid{a}\mathrel{=}\Conid{SumTermAlgebra}\{\mskip1.5mu \Varid{sumLeft}\mathbin{::}\Conid{AlgSig}\;(\Conid{SumTerm}\;\Varid{ty})\;\Varid{a},}$\\
+${\phantom{\mathbf{data}\;\Conid{SumTermAlgebra}\;\Varid{ty}\;\Varid{a}\mathrel{=}\Conid{SumTermAlgebra}\{\mskip1.5mu \mbox{}}\Varid{sumRight}\mathbin{::}\Conid{AlgSig}\;(\Conid{SumTerm}\;\Varid{ty})\;\Varid{a},}$\\
+${\phantom{\mathbf{data}\;\Conid{SumTermAlgebra}\;\Varid{ty}\;\Varid{a}\mathrel{=}\Conid{SumTermAlgebra}\{\mskip1.5mu \mbox{}}\Varid{sumCase}\mathbin{::}\Conid{AlgSig}\;(\Conid{SumTerm}\;\Varid{ty})\;\Varid{a}}$\\
+${\hskip19.50em\relax\mskip1.5mu\}}$\\
+${\mathbf{instance}\;\Conid{Algebra}\;(\Conid{SumTerm}\;\Varid{ty})\;(\Conid{SumTermAlgebra}\;\Varid{ty})\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{SumLeft}\;\anonymous \;\anonymous )\mathrel{=}\Varid{sumLeft}\;\Varid{alg}\;\Varid{t}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{SumRight}\;\anonymous \;\anonymous )\mathrel{=}\Varid{sumRight}\;\Varid{alg}\;\Varid{t}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{SumCase}\;\anonymous \;\anonymous \;\anonymous )\mathrel{=}\Varid{sumCase}\;\Varid{alg}\;\Varid{t}}$\\
+${}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{AlgebraBuilder}\;(\Conid{SumTerm}\;\Varid{ty})\;(\Conid{AlgSig}\;(\Conid{SumTerm}\;\Varid{ty})\;\Varid{a})\;(\Conid{SumTermAlgebra}\;\Varid{ty})\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{mkAlgebra}\;\Varid{\phi}\mathrel{=}\Conid{SumTermAlgebra}\;\Varid{\phi}\;\Varid{\phi}\;\Varid{\phi}}$
+\end{tabbing}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{getMkLeft}\mathrel{=}\Varid{mkTerm2}\;\Conid{SumLeft}}$\\
+${\Varid{getMkRight}\mathrel{=}\Varid{mkTerm2}\;\Conid{SumRight}}$\\
+${\Varid{getMkCase}\mathrel{=}\Varid{mkTerm3}\;\Conid{SumCase}}$\\
+${}$\\
+${}$\\
+${}$\\
+${\mathbf{data}\;\Conid{STMI}\;\Varid{ty}\;\Varid{tm}\mathrel{=}\Conid{STMI}\{\mskip1.5mu \Varid{lc}\mathbin{::}\Varid{tm}\to \Varid{ty}\to \Conid{SumTerm}\;\Varid{ty}\;\Varid{tm},}$\\
+${\phantom{\mathbf{data}\;\Conid{STMI}\;\Varid{ty}\;\Varid{tm}\mathrel{=}\Conid{STMI}\{\mskip1.5mu \mbox{}}\Varid{rc}\mathbin{::}\Varid{tm}\to \Varid{ty}\to \Conid{SumTerm}\;\Varid{ty}\;\Varid{tm},}$\\
+${\phantom{\mathbf{data}\;\Conid{STMI}\;\Varid{ty}\;\Varid{tm}\mathrel{=}\Conid{STMI}\{\mskip1.5mu \mbox{}}\Varid{cc}\mathbin{::}\Varid{tm}\to (\Conid{String},\Varid{tm})\to (\Conid{String},\Varid{tm})\to \Conid{SumTerm}\;\Varid{ty}\;\Varid{tm}}$\\
+${\hskip12.00em\relax\mskip1.5mu\}}$\\
+${}$\\
+${\mathbf{data}\;\Conid{SumTermModule}\;\Varid{ty}\;\Varid{tm}\mathrel{=}\Conid{SumTermModule}\;(\Conid{STMSig}\;\Varid{ty}\;\Varid{tm})}$\\
+${}$\\
+${\Varid{sumModule}\mathrel{=}\Varid{mkModule}\;\bot \;\bot }$\\
+${\hskip1.00em\relax\mathbf{where}\;\Varid{mkModule}\;(\Varid{x}\mathbin{::}\Varid{ty})\;(\Varid{y}\mathbin{::}\Varid{tm})\mathrel{=}\mathbf{let}\;\Varid{mod}\mathbin{::}\Conid{STMI}\;\Varid{ty}\;\Varid{tm}}$\\
+${\hskip1.00em\relax\phantom{\mathbf{where}\;\Varid{mkModule}\;(\Varid{x}\mathbin{::}\Varid{ty})\;(\Varid{y}\mathbin{::}\Varid{tm})\mathrel{=}\mathbf{let}\;\mbox{}}\Varid{mod}\mathrel{=}\Conid{STMI}\;\Conid{SumLeft}\;\Conid{SumRight}\;\Conid{SumCase}}$\\
+${\hskip1.00em\relax\phantom{\mathbf{where}\;\Varid{mkModule}\;(\Varid{x}\mathbin{::}\Varid{ty})\;(\Varid{y}\mathbin{::}\Varid{tm})\mathrel{=}\mbox{}}\mathbf{in}\;\Conid{SumTermModule}\;((\Varid{mkTerm2}\mathbin{\$}\Varid{lc}\;\Varid{mod}),}$\\
+${\hskip1.00em\relax\phantom{\mathbf{where}\;\Varid{mkModule}\;(\Varid{x}\mathbin{::}\Varid{ty})\;(\Varid{y}\mathbin{::}\Varid{tm})\mathrel{=}\mbox{}}\phantom{\mathbf{in}\;\Conid{SumTermModule}\;(\mbox{}}(\Varid{mkTerm2}\mathbin{\$}\Varid{rc}\;\Varid{mod}),}$\\
+${\hskip1.00em\relax\phantom{\mathbf{where}\;\Varid{mkModule}\;(\Varid{x}\mathbin{::}\Varid{ty})\;(\Varid{y}\mathbin{::}\Varid{tm})\mathrel{=}\mbox{}}\phantom{\mathbf{in}\;\Conid{SumTermModule}\;(\mbox{}}(\Varid{mkTerm3}\mathbin{\$}\Varid{cc}\;\Varid{mod}))}$\\
+${}$\\
+${}$\\
+${\mathbf{type}\;\Conid{STMSig}\;\Varid{ty}\;\Varid{tm}\mathrel{=}(\Varid{tm}\to \Varid{ty}\to \Varid{tm},}$\\
+${\phantom{\mathbf{type}\;\Conid{STMSig}\;\Varid{ty}\;\Varid{tm}\mathrel{=}(\mbox{}}\Varid{tm}\to \Varid{ty}\to \Varid{tm},}$\\
+${\phantom{\mathbf{type}\;\Conid{STMSig}\;\Varid{ty}\;\Varid{tm}\mathrel{=}(\mbox{}}\Varid{tm}\to (\Conid{String},\Varid{tm})\to (\Conid{String},\Varid{tm})\to \Varid{tm})}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Module}\;(\Conid{SumTermModule}\;\Varid{ty}\;\Varid{tm})\;(\Conid{STMSig}\;\Varid{ty}\;\Varid{tm})\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{open}\;(\Conid{SumTermModule}\;\Varid{t})\mathrel{=}\Varid{t}}$
+\end{tabbing}
+\subsection{Unit Term}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mbox{\enskip\{-\# OPTIONS -fglasgow-exts -fallow-overlapping-instances -fallow-undecidable-instances -fno-monomorphism-restriction  \#-\}\enskip}}$\\
+${\mathbf{module}\;\Conid{\Conid{InterpreterLib}.\Conid{Terms}.UnitTerm}\;\mathbf{where}}$\\
+${}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Algebras}}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Functors}}$
+\end{tabbing}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{UnitTerm}\;\Varid{x}\mathrel{=}\Conid{UnitTerm}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Functor}\;\Conid{UnitTerm}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;\Conid{UnitTerm}\mathrel{=}\Conid{UnitTerm}}$\\
+${}$\\
+${}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{ZipFunctor}\;\Conid{UnitTerm}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\Varid{f}\;\Conid{UnitTerm}\;\Conid{UnitTerm}\mathrel{=}\Varid{return}\;\Conid{UnitTerm}}$
+\end{tabbing}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{UnitTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{UnitTermAlgebra}\{\mskip1.5mu \Varid{unitTerm}\mathbin{::}\Conid{AlgSig}\;\Conid{UnitTerm}\;\Varid{a}\mskip1.5mu\}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Algebra}\;\Conid{UnitTerm}\;\Conid{UnitTermAlgebra}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathrel{=}\Varid{unitTerm}\;\Varid{alg}\;\Varid{t}}$\\
+${}$\\
+${}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{AlgebraBuilder}\;\Conid{UnitTerm}\;(\Conid{AlgSig}\;\Conid{UnitTerm}\;\Varid{a})\;\Conid{UnitTermAlgebra}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{mkAlgebra}\;\Varid{\phi}\mathrel{=}\Conid{UnitTermAlgebra}\;\Varid{\phi}}$
+\end{tabbing}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{mkUnit}\mathrel{=}\Varid{mkTerm0}\;\Conid{UnitTerm}}$
+\end{tabbing}
+\subsection{Variable Terms}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mbox{\enskip\{-\# OPTIONS -fglasgow-exts -fallow-overlapping-instances -fallow-undecidable-instances -fno-monomorphism-restriction  \#-\}\enskip}}$\\
+${\mathbf{module}\;\Conid{\Conid{InterpreterLib}.\Conid{Terms}.VarTerm}\;\mathbf{where}}$\\
+${}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Algebras}}$\\
+${\mathbf{import}\;\Conid{\Conid{InterpreterLib}.Functors}}$
+\end{tabbing}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{type}\;\Conid{Name}\mathrel{=}\Conid{String}}$\\
+${\mathbf{data}\;\Conid{VarTerm}\;\Varid{a}\mathrel{=}\Conid{VarTerm}\;\Conid{Name}\mid \Conid{DummyTerm}\;\Varid{a}}$\\
+${}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Functor}\;\Conid{VarTerm}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{fmap}\;\Varid{f}\;(\Conid{VarTerm}\;\Varid{n})\mathrel{=}\Conid{VarTerm}\;\Varid{n}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{ZipFunctor}\;\Conid{VarTerm}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{zipFunctor}\;\anonymous \;(\Conid{VarTerm}\;\Varid{x})\;(\Conid{VarTerm}\;\Varid{y})\mid \Varid{x}\equiv \Varid{y}\mathrel{=}\Varid{return}\;(\Conid{VarTerm}\;\Varid{x})}$\\
+${\hskip1.00em\relax\phantom{\Varid{zipFunctor}\;\anonymous \;(\Conid{VarTerm}\;\Varid{x})\;(\Conid{VarTerm}\;\Varid{y}\mbox{}}\mid \Varid{otherwise}\mathrel{=}\Varid{fail}\;\text{\tt \char34 Non-matching~names\char34}}$\\
+${}$\\
+${\mathbf{data}\;\Conid{VarTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{VarTermAlgebra}\{\mskip1.5mu \Varid{varTerm}\mathbin{::}\Conid{VarTerm}\;\Varid{a}\to \Varid{a}}$\\
+${\phantom{\mathbf{data}\;\Conid{VarTermAlgebra}\;\Varid{a}\mathrel{=}\Conid{VarTermAlgebra}\mbox{}}\mskip1.5mu\}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Algebra}\;\Conid{VarTerm}\;\Conid{VarTermAlgebra}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{apply}\;\Varid{alg}\;\Varid{t}\mathord{@}(\Conid{VarTerm}\;\anonymous )\mathrel{=}\Varid{varTerm}\;\Varid{alg}\;\Varid{t}}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{AlgebraBuilder}\;\Conid{VarTerm}\;(\Conid{VarTerm}\;\Varid{a}\to \Varid{a})\;\Conid{VarTermAlgebra}\;\Varid{a}\;\mathbf{where}}$\\
+${\hskip1.00em\relax\Varid{mkAlgebra}\;\Varid{\phi}\mathrel{=}\Conid{VarTermAlgebra}\;\Varid{\phi}}$\\
+${}$\\
+${\Varid{mkVar}\mathrel{=}\Varid{mkTerm}\;\Conid{VarTerm}}$
+\end{tabbing}
+\section{Usage}
+
+This file is a template for transforming literate script into \LaTeX
+and is not actually a \texttt{Haskell} interpreter implementation.
+Each section in this file is a separate module that can be loaded
+individually for experimentation.
+
+Note that the interpreters have been developed under GHC and some
+require turning on the Glasgow Extensions.  Your mileage may vary if
+you're using HUGS.
+
+To build a \LaTeX document from the interpreter files, use:
+
+\begin{alltt}
+   lhs2TeX --math InterpreterLib.lhs > InterpreterLib.tex
+\end{alltt}
+
+and run \LaTeX on the result.
+
+\bibliography{sldg.bib}
+
+\end{document}

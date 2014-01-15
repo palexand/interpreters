@@ -1,0 +1,677 @@
+\documentclass[10pt]{article}
+
+%% ODER: format ==         = "\mathrel{==}"
+%% ODER: format /=         = "\neq "
+\makeatletter
+
+\usepackage{amstext}
+\usepackage{amssymb}
+\usepackage{stmaryrd}
+\DeclareFontFamily{OT1}{cmtex}{}
+\DeclareFontShape{OT1}{cmtex}{m}{n}
+  {<5><6><7><8>cmtex8
+   <9>cmtex9
+   <10><10.95><12><14.4><17.28><20.74><24.88>cmtex10}{}
+\DeclareFontShape{OT1}{cmtex}{m}{it}
+  {<-> ssub * cmtt/m/it}{}
+\newcommand{\texfamily}{\fontfamily{cmtex}\selectfont}
+\DeclareFontShape{OT1}{cmtt}{bx}{n}
+  {<5><6><7><8>cmtt8
+   <9>cmbtt9
+   <10><10.95><12><14.4><17.28><20.74><24.88>cmbtt10}{}
+\DeclareFontShape{OT1}{cmtex}{bx}{n}
+  {<-> ssub * cmtt/bx/n}{}
+\newcommand{\tex}[1]{\text{\texfamily#1}}	% NEU
+
+\newcommand{\Sp}{\hskip.33334em\relax}
+
+\newlength{\lwidth}\setlength{\lwidth}{4.5cm}
+\newlength{\cwidth}\setlength{\cwidth}{8mm} % 3mm
+
+\newcommand{\Conid}[1]{\mathit{#1}}
+\newcommand{\Varid}[1]{\mathit{#1}}
+\newcommand{\anonymous}{\kern0.06em \vbox{\hrule\@width.5em}}
+\newcommand{\plus}{\mathbin{+\!\!\!+}}
+\newcommand{\bind}{\mathbin{>\!\!\!>\mkern-6.7mu=}}
+\newcommand{\sequ}{\mathbin{>\!\!\!>}}
+\renewcommand{\leq}{\leqslant}
+\renewcommand{\geq}{\geqslant}
+\newcommand{\NB}{\textbf{NB}}
+\newcommand{\Todo}[1]{$\langle$\textbf{To do:}~#1$\rangle$}
+
+\makeatother
+
+%\usepackage{haskell}
+
+\usepackage{proof}
+\usepackage{fullpage}
+
+\bibliographystyle{plain}
+
+\parskip=\medskipamount
+\parindent=0pt
+
+\newcommand{\isa}{\ensuremath{\; {:}{:}{=} \;}}
+\newcommand{\ora}{\ensuremath{\;\mid\;}}
+\newcommand{\IF}{\ensuremath{\mathtt{ if \;}}}
+\newcommand{\THEN}{\ensuremath{\mathtt{\; then \;}}}
+\newcommand{\ELSE}{\ensuremath{\mathtt{\; else \;}}}
+\newcommand{\TRUE}{\ensuremath{\mathtt{ true \;}}}
+\newcommand{\FALSE}{\ensuremath{\mathtt{\; false \;}}}
+\newcommand{\BOOL}{\ensuremath{\mathtt{\; Bool \;}}}
+
+\title{EECS 762 - Project 3 Solution}
+\author{Perry Alexander \\
+  The University of Kansas EECS Department\\
+  \texttt{alex@ittc.ku.edu}}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+The objective of Project 3 is to write an interpreter for simply typed
+lambda calculus with subtyping and records ($\lambda_{<:}$)
+expressions as defined in \emph{Types and Programming
+Languages}~\cite{Pie02a}, Chapters 15 and 16.  In addition, you were
+to include booleans and the $\IF$ special form.  The definition of the
+abstract syntax provides the following three forms for $\lambda_{<:}$
+terms, values and types in:
+
+\begin{eqnarray*}
+  t & \isa & x \ora \lambda x:T.t \ora t\; t \ora \\
+    &      & t.l \ora \{l_i=t_i^{i\in 1..n}\} \\
+  v & \isa & \lambda x:T.t \ora \TRUE \ora \FALSE \ora \{l_i=v_i^{i\in 1..n}\}\\
+  T & \isa & \BOOL \ora T \rightarrow T \ora \{l_i:T_i^{i\in 1..n}\} \ora Top
+\end{eqnarray*}
+
+The definition for call-by-value evaluation provides the following
+evaluation rules that will define the evaluation function:
+
+\[\vcenter{\infer[\textsc{E-App1}]
+	{t_1 t_2 \longrightarrow t_1^{'} t_2}
+	{t_1\longrightarrow t_1^{'}}}\]
+
+\[\vcenter{\infer[\textsc{E-App2}]
+	{t_1 t_2 \longrightarrow t_1 t_2^{'}}
+	{t_2\longrightarrow t_2^{'}}}\]
+
+\[\vcenter{\infer[\textsc{E-AppAbs}]
+	{(\lambda x:T.t_{12})v_2 \longrightarrow [x\rightarrow v_2]t_{12}}
+	{}}\]
+
+\[\vcenter{\infer[\textsc{E-IfTrue}]
+	{t_2}
+	{\IF \TRUE \THEN t_2 \ELSE t_3}}\]
+
+\[\vcenter{\infer[\textsc{E-IfFalse}]
+	{t_3}
+	{\IF \FALSE \THEN t_2 \ELSE t_3}}\]
+
+\[\vcenter{\infer[\textsc{E-If}]
+  {\IF t_1 \THEN t_2 \ELSE t_3 \rightarrow \IF t_1^{'} \THEN t_2 \ELSE t_3}
+  {t\rightarrow t_1^{'}}}\]
+
+\[\vcenter{\infer[\textsc{E-ProjRcd}]
+  {\{l_i=v_i^{i\in 1..n}\}.l_j \longrightarrow v_j}
+  {}}\]
+
+\[\vcenter{\infer[\textsc{E-Proj}]
+  {t_1.l \longrightarrow t_1^{'}.l}
+  {t_1 \longrightarrow t_1^{'}}}\]
+
+Finally, the definition provides the following typing rules that will
+define the type inference function:
+
+\[\vcenter{\infer[\textsc{T-Var}]{\Gamma\vdash x:T}{x:T\in\Gamma}}\]
+
+\[\vcenter{\infer[\textsc{T-Abs}]
+  {\Gamma\vdash\lambda x:T_1.t_2 : T_1\rightarrow T_2}
+  {\Gamma,x:T_1\vdash t_2 : T_2}}
+\]
+
+\[\vcenter{\infer[\textsc{T-App}]
+  {\Gamma\vdash t_1\; t_2 : T_{12}}
+  {\Gamma\vdash t_1 : T_{11}\rightarrow T_{12} & \Gamma\vdash t_2:T_{11}}}
+\]
+
+\[\vcenter{\infer[\textsc{T-If}]
+  {\Gamma\vdash \IF t_1 \THEN t_2 \ELSE t_3 : T}
+  {\Gamma\vdash t_1 : \BOOL & \Gamma\vdash t_2 : T & \Gamma\vdash t_3 : T}}
+\]
+
+\[\vcenter{\infer{\TRUE:\BOOL}{}}\]
+
+\[\vcenter{\infer{\FALSE:\BOOL}{}}\]
+
+Our objective is to: (i) define a data structure for representing
+$\lambda_{<:}$ terms embodying the abstract syntax; (ii) a type
+derivation function for $\lambda_{<:}$ terms embodying the type
+rules; and (iii) an evaluation function for $\lambda_{<:}$
+terms embodying the evaluation rules.
+
+\section{SubtypedLambdaMonad Module}
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{module}\;\Conid{SubtypedLambdaMonad}\;(\Conid{Term}\;(\mathinner{\ldotp\ldotp}))}$\\
+${\hskip2.00em\relax\mathbf{where}}$
+\end{tabbing}
+The \ensuremath{\Conid{SubtypedLambdaMonad}} module provides the basic definitions for
+manipulating simply typed lambda calculus expressions with subtyping
+and records added.  As indicated by the module name, a monad is used
+to implement the evaluation and type checking processes.  The data
+type representing terms and types is first defined, followed by the
+type checking function, subtyping function, and the evaluation
+function.
+
+\subsection{Data Types}
+
+An abstract type \ensuremath{\Varid{T}}, is defined to represent the two possible
+types in $\lambda_{<:}$.  A constant represents the Boolean
+type while a pair of types represents the $\rightarrow$ type former
+application.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{import}\;\Conid{\Conid{Data}.List}}$\\
+${\mathbf{data}\;\Conid{Retval}\;\Varid{a}\mathrel{=}}$\\
+${\hskip2.00em\relax\Conid{Value}\;\Varid{a}\mid \Conid{Error}\;\Conid{String}}$\\
+${\hskip2.00em\relax\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$\\
+${}$\\
+${\mathbf{instance}\;\Conid{Monad}\;\Conid{Retval}\;\mathbf{where}}$\\
+${\hskip2.00em\relax\Conid{Error}\;\Varid{s}\bind \Varid{k}\mathrel{=}\Conid{Error}\;\Varid{s}}$\\
+${\hskip2.00em\relax\Conid{Value}\;\Varid{a}\bind \Varid{k}\mathrel{=}\Varid{k}\;\Varid{a}}$\\
+${\hskip2.00em\relax\Varid{return}\mathrel{=}\Conid{Value}}$\\
+${\hskip2.00em\relax\Varid{fail}\mathrel{=}\Conid{Error}}$\\
+${}$\\
+${\mathbf{data}\;\Varid{T}\mathrel{=}}$\\
+${\hskip2.00em\relax\Conid{TyBool}\mid }$\\
+${\hskip2.00em\relax\Conid{TyTop}\mid }$\\
+${\hskip2.00em\relax\Conid{TyArr}\;\Varid{T}\;\Varid{T}\mid }$\\
+${\hskip2.00em\relax\Conid{TyTpl}\;[\mskip1.5mu \Varid{T}\mskip1.5mu]\mid }$\\
+${\hskip2.00em\relax\Conid{TyRec}\;[\mskip1.5mu (\Conid{String},\Varid{T})\mskip1.5mu]}$\\
+${\hskip2.00em\relax\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$\\
+${}$\\
+${\Varid{dom}\mathbin{::}\Varid{T}\to \Conid{Retval}\;\Varid{T}}$\\
+${\Varid{dom}\;\Varid{t}\mathrel{=}}$\\
+${\phantom{\Varid{dom}\;\mbox{}}\mathbf{case}\;\Varid{t}\;\mathbf{of}}$\\
+${\phantom{\Varid{dom}\;\mbox{}}\phantom{\mathbf{case}\;\Varid{t}\;\mbox{}}\Conid{TyArr}\;\Varid{d}\;\anonymous \to \Varid{return}\;\Varid{d}}$\\
+${\phantom{\Varid{dom}\;\mbox{}}\phantom{\mathbf{case}\;\Varid{t}\;\mbox{}}\Conid{TyBool}\to \Varid{fail}\;\text{\tt \char34 Type~Error~-~Cannot~find~domain~of~a~boolean~type\char34}}$\\
+${\phantom{\Varid{dom}\;\mbox{}}\phantom{\mathbf{case}\;\Varid{t}\;\mbox{}}\Conid{TyRec}\;\anonymous \to \Varid{fail}\;\text{\tt \char34 Type~Error~-~Cannot~find~domain~of~a~record~type~\char34}}$\\
+${\phantom{\Varid{dom}\;\mbox{}}\phantom{\mathbf{case}\;\Varid{t}\;\mbox{}}\Conid{TyTpl}\;\anonymous \to \Varid{fail}\;\text{\tt \char34 Type~Error~-~Cannot~find~the~domain~of~a~tuple~tye\char34}}$\\
+${\phantom{\Varid{dom}\;\mbox{}}\phantom{\mathbf{case}\;\Varid{t}\;\mbox{}}\Conid{TyTop}\to \Varid{fail}\;\text{\tt \char34 Type~Error~-~Cannot~find~the~domain~of~top\char34}}$\\
+${}$\\
+${\Varid{ran}\mathbin{::}\Varid{T}\to \Conid{Retval}\;\Varid{T}}$\\
+${\Varid{ran}\;\Varid{t}\mathrel{=}}$\\
+${\phantom{\Varid{ran}\;\mbox{}}\mathbf{case}\;\Varid{t}\;\mathbf{of}}$\\
+${\phantom{\Varid{ran}\;\mbox{}}\phantom{\mathbf{case}\;\Varid{t}\;\mbox{}}\Conid{TyArr}\;\anonymous \;\Varid{r}\to \Varid{return}\;\Varid{r}}$\\
+${\phantom{\Varid{ran}\;\mbox{}}\phantom{\mathbf{case}\;\Varid{t}\;\mbox{}}\Conid{TyBool}\to \Varid{fail}\;\text{\tt \char34 Type~Error~-~Cannot~find~range~of~a~boolean~type\char34}}$\\
+${\phantom{\Varid{ran}\;\mbox{}}\phantom{\mathbf{case}\;\Varid{t}\;\mbox{}}\Conid{TyRec}\;\anonymous \to \Varid{fail}\;\text{\tt \char34 Type~Error~-~Cannot~find~range~of~a~record~type\char34}}$\\
+${\phantom{\Varid{ran}\;\mbox{}}\phantom{\mathbf{case}\;\Varid{t}\;\mbox{}}\Conid{TyTpl}\;\anonymous \to \Varid{fail}\;\text{\tt \char34 Type~Error~-~Cannot~find~the~range~of~a~tuple~tye\char34}}$\\
+${\phantom{\Varid{ran}\;\mbox{}}\phantom{\mathbf{case}\;\Varid{t}\;\mbox{}}\Conid{TyTop}\to \Varid{fail}\;\text{\tt \char34 Type~Error~-~Cannot~find~range~of~top\char34}}$\\
+${}$\\
+${\Varid{isArr}\mathbin{::}\Varid{T}\to \Conid{Bool}}$\\
+${\Varid{isArr}\;(\Conid{TyArr}\;\anonymous \;\anonymous )\mathrel{=}\Conid{True}}$\\
+${\Varid{isArr}\;\anonymous \mathrel{=}\Conid{False}}$\\
+${}$\\
+${\Varid{isRec}\mathbin{::}\Varid{T}\to \Conid{Bool}}$\\
+${\Varid{isRec}\;(\Conid{TyRec}\;\anonymous )\mathrel{=}\Conid{True}}$\\
+${\Varid{isRec}\;\anonymous \mathrel{=}\Conid{False}}$\\
+${}$\\
+${\Varid{isTpl}\mathbin{::}\Varid{T}\to \Conid{Bool}}$\\
+${\Varid{isTpl}\;(\Conid{TyTpl}\;\anonymous )\mathrel{=}\Conid{True}}$\\
+${\Varid{isTpl}\;\anonymous \mathrel{=}\Conid{False}}$
+\end{tabbing}
+A constructed type, \ensuremath{\Conid{Term}}, is defined to represent the abstract
+syntax for $\lambda_{<:}$ terms.  Note that this definition is
+identical to that used in $\lambda_{<:}$ except \ensuremath{\Conid{Lambda}}
+includes a type annotation, the \ensuremath{\Conid{If}} construct is defined, and boolean
+costants have been added.  The implementation of the \ensuremath{\Conid{Term}} type is a
+Maybe type that either represents a legal term or a form that cannot
+be evaluated.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{data}\;\Conid{Term}\mathrel{=}}$\\
+${\hskip2.00em\relax\Conid{TmTrue}\mid \Conid{TmFalse}\mid }$\\
+${\hskip2.00em\relax\Conid{If}\;\Conid{Term}\;\Conid{Term}\;\Conid{Term}\mid }$\\
+${\hskip2.00em\relax\Conid{Var}\;\Conid{Int}\mid }$\\
+${\hskip2.00em\relax\Conid{Lambda}\;\Varid{T}\;\Conid{Term}\mid }$\\
+${\hskip2.00em\relax\Conid{AppV}\;\Conid{Term}\;\Conid{Term}\mid }$\\
+${\hskip2.00em\relax\Conid{AppN}\;\Conid{Term}\;\Conid{Term}\mid }$\\
+${\hskip2.00em\relax\Conid{Rec}\;[\mskip1.5mu (\Conid{String},\Conid{Term})\mskip1.5mu]\mid }$\\
+${\hskip2.00em\relax\Conid{Tpl}\;[\mskip1.5mu \Conid{Term}\mskip1.5mu]\mid }$\\
+${\hskip2.00em\relax\Conid{ProjRcd}\;\Conid{Term}\;\Conid{String}\mid }$\\
+${\hskip2.00em\relax\Conid{ProjTpl}\;\Conid{Term}\;\Conid{Int}}$\\
+${\hskip2.00em\relax\mathbf{deriving}\;(\Conid{Eq},\Conid{Show})}$
+\end{tabbing}
+The \ensuremath{\Varid{value}} function defines a predicate that specifies $\lambda_{<:}$
+terms that are values.  By definition, \ensuremath{\Conid{TmTrue}}, \ensuremath{\Conid{TmFalse}}, \ensuremath{\Conid{Lambda}}
+forms, \ensuremath{\Conid{Rec}} and \ensuremath{\Conid{Tpl}} are constructors for values.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{value}\mathbin{::}\Conid{Term}\to \Conid{Bool}}$\\
+${\Varid{value}\;\Conid{TmTrue}\mathrel{=}\Conid{True}}$\\
+${\Varid{value}\;\Conid{TmFalse}\mathrel{=}\Conid{True}}$\\
+${\Varid{value}\;(\Conid{Lambda}\;\anonymous \;\anonymous )\mathrel{=}\Conid{True}}$\\
+${\Varid{value}\;(\Conid{Rec}\;\anonymous )\mathrel{=}\Conid{True}}$\\
+${\Varid{value}\;(\Conid{Tpl}\;\anonymous )\mathrel{=}\Conid{True}}$\\
+${\Varid{value}\;\anonymous \mathrel{=}\Conid{False}}$
+\end{tabbing}
+The \ensuremath{\Conid{TmTrue}} and \ensuremath{\Conid{TmFalse}} values represent the Boolean
+values true and false respectively.  The \ensuremath{\Conid{If}} constructor
+defines a classical if-expression.  The \ensuremath{\Conid{Var}} construtor
+identifies the index for a variable and corresponds with the $x$ form
+in the abstract syntax.  The \ensuremath{\Conid{Lambda}} constructor defines an
+abstraction by specifying a term and corresponds with the $\lambda
+x:T.t$ form in the abstract syntax.  The \ensuremath{\Conid{AppV}} cosntructor
+defines the application of one term to another using call-by-value
+semantics.  Similarly, the \ensuremath{\Conid{AppN}} constructor defines the
+appliation of one term to another using call-by-name semantics.  Both
+forms correspond with the \ensuremath{\Varid{t}\;\Varid{t}} form in the abstract syntax.
+
+The original $\lambda$ language implemented untyped lambda
+calculus.  Thus, the maintenance of context information was
+unnecessary.  For $\lambda_{<:}$, the types of variables must
+be maintained as a part of context for type checking.  The
+\ensuremath{\Varid{\Gamma}} type is used to store a list of variable bindings that
+will be used to maintain the types associated with variables in
+context.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\mathbf{type}\;\Varid{\Gamma}\mathrel{=}[\mskip1.5mu \Varid{T}\mskip1.5mu]}$
+\end{tabbing}
+To mainipulate the context, the following functions are defined:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{addBinding}\mathbin{::}\Varid{\Gamma}\to \Varid{T}\to \Varid{\Gamma}}$\\
+${\Varid{addBinding}\;\Varid{\gamma}\;\Varid{t}\mathrel{=}\Varid{t}\mathbin{:}\Varid{\gamma}}$\\
+${}$\\
+${\Varid{getTypeFromContext}\mathbin{::}\Varid{\Gamma}\to \Conid{Int}\to \Conid{Retval}\;\Varid{T}}$\\
+${\Varid{getTypeFromContext}\;\Varid{c}\;\Varid{v}\mathrel{=}\mathbf{if}\;((\Varid{length}\;\Varid{c})\geq \Varid{v})}$\\
+${\phantom{\Varid{getTypeFromContext}\;\Varid{c}\;\Varid{v}\mathrel{=}\mbox{}}\mathbf{then}\;\Varid{return}\;(\Varid{c}\mathbin{!!}\Varid{v})}$\\
+${\phantom{\Varid{getTypeFromContext}\;\Varid{c}\;\Varid{v}\mathrel{=}\mbox{}}\mathbf{else}\;\Varid{fail}\;\text{\tt \char34 Type~Error~-~Variable~out~of~scope\char34}}$\\
+${}$\\
+${\Varid{findField}\mathbin{::}\Varid{\Gamma}\to \Conid{String}\to \Varid{T}\to \Conid{Retval}\;\Varid{T}}$\\
+${\Varid{findField}\;\Varid{\gamma}\;\Varid{s}_1\;(\Conid{TyRec}\;\Varid{l})\mathrel{=}\Varid{findField2}\;\Varid{\gamma}\;\Varid{s}_1\;\Varid{l}}$\\
+${}$\\
+${\Varid{findField2}\mathbin{::}\Varid{\Gamma}\to \Conid{String}\to [\mskip1.5mu (\Conid{String},\Varid{T})\mskip1.5mu]\to \Conid{Retval}\;\Varid{T}}$\\
+${\Varid{findField2}\;\anonymous \;\anonymous \;[\mskip1.5mu \mskip1.5mu]\mathrel{=}\Varid{fail}\;\text{\tt \char34 Type~Error~-~Field~name~not~found\char34}}$\\
+${\Varid{findField2}\;\Varid{\gamma}\;\Varid{s}_1\;((\Varid{s}_2,\Varid{t})\mathbin{:}\Varid{l})\mathrel{=}\mathbf{if}\;\Varid{s}_1\equiv \Varid{s}_2}$\\
+${\phantom{\Varid{findField2}\;\Varid{\gamma}\;\Varid{s}_1\;((\Varid{s}_2,\Varid{t})\mathbin{:}\Varid{l})\mathrel{=}\mbox{}}\mathbf{then}\;\Varid{return}\;\Varid{t}}$\\
+${\phantom{\Varid{findField2}\;\Varid{\gamma}\;\Varid{s}_1\;((\Varid{s}_2,\Varid{t})\mathbin{:}\Varid{l})\mathrel{=}\mbox{}}\mathbf{else}\;\Varid{findField2}\;\Varid{\gamma}\;\Varid{s}_1\;\Varid{l}}$\\
+${}$\\
+${\Varid{findProj}\mathbin{::}\Varid{\Gamma}\to \Conid{Int}\to \Varid{T}\to \Conid{Retval}\;\Varid{T}}$\\
+${\Varid{findProj}\;\anonymous \;\Varid{i}\;(\Conid{TyTpl}\;\Varid{tl})\mathrel{=}\mathbf{if}\;\Varid{i}\geq \mathrm{0}\mathrel{\wedge}\Varid{i}\mathbin{<}(\Varid{length}\;\Varid{tl})}$\\
+${\hskip9.00em\relax\mathbf{then}\;\Varid{return}\;(\Varid{tl}\mathbin{!!}\Varid{i})}$\\
+${\hskip9.00em\relax\mathbf{else}\;\Varid{fail}\;\text{\tt \char34 Type~Error~-~Tuple~index~out~of~range\char34}}$
+\end{tabbing}
+\subsection{Type Derivation}
+
+Type derivation is achieved using the \ensuremath{\Varid{typeof}_{<:}} function.  Each
+case directly corresponds to one of the typing rules defined for
+$\lambda_{<:}$.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{typeof}_{<:}\mathbin{::}\Varid{\Gamma}\to \Conid{Term}\to \Conid{Retval}\;\Varid{T}}$\\
+${\Varid{typeof}_{<:}\;\Varid{\gamma}\;\Conid{TmTrue}\mathrel{=}\Varid{return}\;\Conid{TyBool}}$\\
+${\Varid{typeof}_{<:}\;\Varid{\gamma}\;\Conid{TmFalse}\mathrel{=}\Varid{return}\;\Conid{TyBool}}$\\
+${\Varid{typeof}_{<:}\;\Varid{\gamma}\;(\Conid{Rec}\;\Varid{l})\mathrel{=}\mathbf{do}\;\Varid{tl}\leftarrow \Varid{mapM}\;(\lambda (\anonymous ,\Varid{x})\to (\Varid{typeof}_{<:}\;\Varid{\gamma}\;\Varid{x}))\;\Varid{l}}$\\
+${\phantom{\Varid{typeof}_{<:}\;\Varid{\gamma}\;(\Conid{Rec}\;\Varid{l})\mathrel{=}\mathbf{do}\;\mbox{}};\Varid{return}\;(\Conid{TyRec}\;(\Varid{zip}\;(\Varid{map}\;(\lambda (\Varid{x},\anonymous )\to \Varid{x})\;\Varid{l})\;\Varid{tl}))}$\\
+${\Varid{typeof}_{<:}\;\Varid{\gamma}\;(\Conid{Tpl}\;\Varid{l})\mathrel{=}\mathbf{do}\;\Varid{tl}\leftarrow \Varid{mapM}\;(\lambda \Varid{x}\to (\Varid{typeof}_{<:}\;\Varid{\gamma}\;\Varid{x}))\;\Varid{l}}$\\
+${\phantom{\Varid{typeof}_{<:}\;\Varid{\gamma}\;(\Conid{Tpl}\;\Varid{l})\mathrel{=}\mathbf{do}\;\mbox{}};\Varid{return}\;(\Conid{TyTpl}\;\Varid{tl})}$\\
+${\Varid{typeof}_{<:}\;\Varid{\gamma}\;(\Conid{ProjRcd}\;\Varid{t}\;\Varid{s})\mathrel{=}}$\\
+${\hskip2.00em\relax\mathbf{do}\;\Varid{rectype}\leftarrow \Varid{typeof}_{<:}\;\Varid{\gamma}\;\Varid{t}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\mathbf{if}\;(\Varid{isRec}\;\Varid{rectype})}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mathbf{if}\;\mbox{}}\mathbf{then}\;\Varid{findField}\;\Varid{\gamma}\;\Varid{s}\;\Varid{rectype}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mathbf{if}\;\mbox{}}\mathbf{else}\;\Varid{fail}\;\text{\tt \char34 Type~Error~-~Cannot~project~a~non-record~type.\char34}}$\\
+${\Varid{typeof}_{<:}\;\Varid{\gamma}\;(\Conid{ProjTpl}\;\Varid{t}\;\Varid{i})\mathrel{=}}$\\
+${\hskip2.00em\relax\mathbf{do}\;\Varid{tpltype}\leftarrow \Varid{typeof}_{<:}\;\Varid{\gamma}\;\Varid{t}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\mathbf{if}\;(\Varid{isTpl}\;\Varid{tpltype})}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mathbf{if}\;\mbox{}}\mathbf{then}\;\Varid{findProj}\;\Varid{\gamma}\;\Varid{i}\;\Varid{tpltype}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mathbf{if}\;\mbox{}}\mathbf{else}\;\Varid{fail}\;\text{\tt \char34 Type~Error~-~Cannot~project~a~non-tuple~type.\char34}}$\\
+${\Varid{typeof}_{<:}\;\Varid{\gamma}\;(\Conid{If}\;\Varid{t}_1\;\Varid{t}_2\;\Varid{t}_3)\mathrel{=}}$\\
+${\hskip2.00em\relax\mathbf{if}\;(\Varid{typeof}_{<:}\;\Varid{\gamma}\;\Varid{t}_1)\equiv \Varid{return}\;\Conid{TyBool}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{if}\;\mbox{}}\mathbf{then}\;\mathbf{let}\;\Varid{tt}_1\mathrel{=}\Varid{typeof}_{<:}\;\Varid{\gamma}\;\Varid{t}_2;\Varid{tt}_2\mathrel{=}\Varid{typeof}_{<:}\;\Varid{\gamma}\;\Varid{t}_3\;\mathbf{in}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{if}\;\mbox{}}\phantom{\mathbf{then}\;\mathbf{let}\;\mbox{}}\mathbf{if}\;\Varid{tt}_1\equiv \Varid{tt}_2\;\mathbf{then}\;\Varid{tt}_2}$\\
+${\hskip2.00em\relax\phantom{\mathbf{if}\;\mbox{}}\phantom{\mathbf{then}\;\mathbf{let}\;\mbox{}}\mathbf{else}\;\Varid{fail}\;\text{\tt \char34 Type~Error~-~If~branches~of~different~types\char34}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{if}\;\mbox{}}\mathbf{else}\;\Varid{fail}\;\text{\tt \char34 Type~Error~-~If~conditional~not~boolean\char34}}$\\
+${\Varid{typeof}_{<:}\;\Varid{\gamma}\;(\Conid{Var}\;\Varid{x})\mathrel{=}(\Varid{getTypeFromContext}\;\Varid{\gamma}\;\Varid{x})}$\\
+${\Varid{typeof}_{<:}\;\Varid{\gamma}\;(\Conid{AppV}\;\Varid{t}_1\;\Varid{t}_2)\mathrel{=}}$\\
+${\hskip2.00em\relax\mathbf{do}\;\Varid{tt}_1\leftarrow \Varid{typeof}_{<:}\;\Varid{\gamma}\;\Varid{t}_1}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{tt}_2\leftarrow \Varid{typeof}_{<:}\;\Varid{\gamma}\;\Varid{t}_2}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{dtt}_1\leftarrow \Varid{dom}\;\Varid{tt}_1}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\mathbf{if}\;\Varid{isArr}\;\Varid{tt}_1\;\mathbf{then}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mathbf{if}\;\mbox{}}\mathbf{if}\;(\Varid{subtype}\;\Varid{tt}_2\;\Varid{dtt}_1)\;\mathbf{then}\;\Varid{return}\;\Varid{tt}_2}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mathbf{if}\;\mbox{}}\phantom{\mathbf{if}\;\mbox{}}\mathbf{else}\;\Varid{fail}\;\text{\tt \char34 Type~Error~-~Argument~type~is~not~a~subtype~of~domain\char34}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\hskip1.50em\relax\mathbf{else}\;\Varid{fail}\;\text{\tt \char34 Type~Error~-~Term~is~not~an~abstraction\char34}}$\\
+${\Varid{typeof}_{<:}\;\Varid{\gamma}\;(\Conid{AppN}\;\Varid{t}_1\;\Varid{t}_2)\mathrel{=}}$\\
+${\hskip2.00em\relax\mathbf{do}\;\Varid{tt}_1\leftarrow \Varid{typeof}_{<:}\;\Varid{\gamma}\;\Varid{t}_1}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{tt}_2\leftarrow \Varid{typeof}_{<:}\;\Varid{\gamma}\;\Varid{t}_2}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{dtt}_1\leftarrow \Varid{dom}\;\Varid{tt}_1}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\mathbf{if}\;\Varid{isArr}\;\Varid{tt}_1\;\mathbf{then}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mathbf{if}\;\mbox{}}\mathbf{if}\;(\Varid{subtype}\;\Varid{tt}_2\;\Varid{dtt}_1)\;\mathbf{then}\;\Varid{return}\;\Varid{tt}_2}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mathbf{if}\;\mbox{}}\phantom{\mathbf{if}\;\mbox{}}\mathbf{else}\;\Varid{fail}\;\text{\tt \char34 Type~Error~-~Argument~type~is~not~a~subtype~of~domain\char34}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\hskip1.50em\relax\mathbf{else}\;\Varid{fail}\;\text{\tt \char34 Type~Error~-~Term~is~not~an~abstraction\char34}}$\\
+${\Varid{typeof}_{<:}\;\Varid{\gamma}\;(\Conid{Lambda}\;\Varid{ty}\;\Varid{t})\mathrel{=}}$\\
+${\hskip2.00em\relax\mathbf{do}\;\Varid{tt}\leftarrow \Varid{typeof}_{<:}\;(\Varid{addBinding}\;\Varid{\gamma}\;\Varid{ty})\;\Varid{t}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\Varid{tt}\leftarrow \mbox{}};\Varid{return}\;(\Conid{TyArr}\;\Varid{ty}\;\Varid{tt})}$
+\end{tabbing}
+The \ensuremath{\Varid{subtype}} function defines when one type is a subtype of another.
+\ensuremath{\Conid{TyBool}} is only a subtype of itself.  A function type, \ensuremath{\Conid{TyArr}\;\Varid{ty11}\;\Varid{ty12}} is a subtype of \ensuremath{\Conid{TyArr}\;\Varid{ty21}\;\Varid{ty22}} if \ensuremath{\Varid{subtype}\;\Varid{ty21}\;\Varid{ty11}} and
+\ensuremath{\Varid{subtype}\;\Varid{ty12}\;\Varid{ty22}}.  A record, \ensuremath{\Conid{TyRec}} is a subtype of another if
+it's list of label, type pairs intersects with the other's label, type
+pairs.  \ensuremath{\Conid{TyTop}} is by definition a supertype of everything while all
+other subtyping attempts are illegal.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{subtype}\mathbin{::}\Varid{T}\to \Varid{T}\to \Conid{Bool}}$\\
+${\Varid{subtype}\;\Conid{TyBool}\;\Conid{TyBool}\mathrel{=}\Conid{True}}$\\
+${\Varid{subtype}\;(\Conid{TyArr}\;\Varid{ty11}\;\Varid{ty12})\;(\Conid{TyArr}\;\Varid{ty21}\;\Varid{ty22})\mathrel{=}}$\\
+${\hskip2.00em\relax\Varid{subtype}\;\Varid{ty21}\;\Varid{ty11}\mathrel{\wedge}\Varid{subtype}\;\Varid{ty12}\;\Varid{ty22}}$\\
+${\Varid{subtype}\;(\Conid{TyRec}\;\Varid{l1})\;(\Conid{TyRec}\;\Varid{l2})\mathrel{=}(\Varid{intersect}\;\Varid{l1}\;\Varid{l2})\equiv \Varid{l1}}$\\
+${\Varid{subtype}\;(\Conid{TyTpl}\;\Varid{l1})\;(\Conid{TyTpl}\;\Varid{l2})\mathrel{=}(\Varid{isPrefixOf}\;\Varid{l1}\;\Varid{l2})}$\\
+${\Varid{subtype}\;\anonymous \;\Conid{TyTop}\mathrel{=}\Conid{True}}$\\
+${\Varid{subtype}\;\anonymous \;\anonymous \mathrel{=}\Conid{False}}$
+\end{tabbing}
+\subsection{Shifting and Substituting}
+
+Our implementation uses de Brujin indices as a basis for
+representation and evaluation.  Thus, definitions of \ensuremath{\Varid{shift}}
+and \ensuremath{\Varid{subst}} are required to implement elements of the evalation
+function.  These functions are largely the same as those used in
+Project 1 except they must deal with type information.
+
+The \ensuremath{\Varid{shift}} definition provides a case for shifting over each
+valid $\lambda$ form as defined in the \ensuremath{\Conid{Term}} data type.  This
+definition follows directly from the standard definition of shift from
+TPL Chapter 8:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{shift}\mathbin{::}\Conid{Term}\to \Conid{Int}\to \Conid{Int}\to \Conid{Term}}$\\
+${\Varid{shift}\;\Conid{TmTrue}\;\Varid{c}\;\Varid{d}\mathrel{=}\Conid{TmTrue}}$\\
+${\Varid{shift}\;\Conid{TmFalse}\;\Varid{c}\;\Varid{d}\mathrel{=}\Conid{TmFalse}}$\\
+${\Varid{shift}\;(\Conid{Rec}\;\Varid{l})\;\Varid{c}\;\Varid{d}\mathrel{=}}$\\
+${\hskip2.00em\relax(\Conid{Rec}\;(\Varid{map}\;(\lambda (\Varid{str},\Varid{t})\to (\Varid{str},(\Varid{shift}\;\Varid{t}\;\Varid{c}\;\Varid{d})))\;\Varid{l}))}$\\
+${\Varid{shift}\;(\Conid{Tpl}\;\Varid{l})\;\Varid{c}\;\Varid{d}\mathrel{=}}$\\
+${\hskip2.00em\relax(\Conid{Tpl}\;(\Varid{map}\;(\lambda \Varid{t}\to (\Varid{shift}\;\Varid{t}\;\Varid{c}\;\Varid{d}))\;\Varid{l}))}$\\
+${\Varid{shift}\;(\Conid{ProjRcd}\;\Varid{r}\;\Varid{s})\;\Varid{c}\;\Varid{d}\mathrel{=}(\Conid{ProjRcd}\;(\Varid{shift}\;\Varid{r}\;\Varid{c}\;\Varid{d})\;\Varid{s})}$\\
+${\Varid{shift}\;(\Conid{ProjTpl}\;\Varid{t}\;\Varid{i})\;\Varid{c}\;\Varid{d}\mathrel{=}(\Conid{ProjTpl}\;(\Varid{shift}\;\Varid{t}\;\Varid{c}\;\Varid{d})\;\Varid{i})}$\\
+${\Varid{shift}\;(\Conid{Var}\;\Varid{x})\;\Varid{c}\;\Varid{d}\mathrel{=}\mathbf{if}\;\Varid{x}\mathbin{<}\Varid{c}\;\mathbf{then}\;(\Conid{Var}\;\Varid{x})\;\mathbf{else}\;(\Conid{Var}\;(\Varid{x}\mathbin{+}\Varid{d}))}$\\
+${\Varid{shift}\;(\Conid{Lambda}\;\Varid{ty}\;\Varid{t})\;\Varid{c}\;\Varid{d}\mathrel{=}(\Conid{Lambda}\;\Varid{ty}\;(\Varid{shift}\;\Varid{t}\;(\Varid{c}\mathbin{+}\mathrm{1})\;\Varid{d}))}$\\
+${\Varid{shift}\;(\Conid{AppV}\;\Varid{t}_1\;\Varid{t}_2)\;\Varid{c}\;\Varid{d}\mathrel{=}(\Conid{AppV}\;(\Varid{shift}\;\Varid{t}_1\;\Varid{c}\;\Varid{d})\;(\Varid{shift}\;\Varid{t}_2\;\Varid{c}\;\Varid{d}))}$\\
+${\Varid{shift}\;(\Conid{AppN}\;\Varid{t}_1\;\Varid{t}_2)\;\Varid{c}\;\Varid{d}\mathrel{=}(\Conid{AppN}\;(\Varid{shift}\;\Varid{t}_1\;\Varid{c}\;\Varid{d})\;(\Varid{shift}\;\Varid{t}_2\;\Varid{c}\;\Varid{d}))}$
+\end{tabbing}
+\ensuremath{\Conid{Lambda}}, \ensuremath{\Conid{AppV}}, and \ensuremath{\Conid{AppN}} terms are shifted by
+shifting their identified terms.  Shifting a \ensuremath{\Conid{Var}} term
+requires application of the definition from Chapter 8.  Specifically,
+the index for a variable is shifted by \ensuremath{\Varid{d}} if its index is
+greater than \ensuremath{\Varid{c}}.
+
+The \ensuremath{\Varid{subst}} definition again provides a case for substitution
+over each value $\lambda$ as defined in the \ensuremath{\Conid{Term}} data
+type.  This definition follows directly from teh standard definition
+of substitution from TPL Chapter 8:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{subst}\mathbin{::}\Conid{Int}\to \Conid{Term}\to \Conid{Term}\to \Conid{Term}}$\\
+${\Varid{subst}\;\Varid{j}\;\Varid{s}\;(\Conid{Var}\;\Varid{x})\mathrel{=}\mathbf{if}\;\Varid{x}\equiv \Varid{j}\;\mathbf{then}\;\Varid{s}\;\mathbf{else}\;(\Conid{Var}\;\Varid{x})}$\\
+${\Varid{subst}\;\Varid{j}\;\Varid{s}\;(\Conid{Lambda}\;\Varid{ty}\;\Varid{t})\mathrel{=}(\Conid{Lambda}\;\Varid{ty}\;(\Varid{subst}\;(\Varid{j}\mathbin{+}\mathrm{1})\;(\Varid{shift}\;\Varid{s}\;\mathrm{0}\;\mathrm{1})\;\Varid{t}))}$\\
+${\Varid{subst}\;\Varid{j}\;\Varid{s}\;(\Conid{AppV}\;\Varid{t}_1\;\Varid{t}_2)\mathrel{=}(\Conid{AppV}\;(\Varid{subst}\;\Varid{j}\;\Varid{s}\;\Varid{t}_1)\;(\Varid{subst}\;\Varid{j}\;\Varid{s}\;\Varid{t}_2))}$\\
+${\Varid{subst}\;\Varid{j}\;\Varid{s}\;(\Conid{AppN}\;\Varid{t}_1\;\Varid{t}_2)\mathrel{=}(\Conid{AppN}\;(\Varid{subst}\;\Varid{j}\;\Varid{s}\;\Varid{t}_1)\;(\Varid{subst}\;\Varid{j}\;\Varid{s}\;\Varid{t}_2))}$\\
+${\Varid{subst}\;\anonymous \;\anonymous \;\Conid{TmTrue}\mathrel{=}\Conid{TmTrue}}$\\
+${\Varid{subst}\;\anonymous \;\anonymous \;\Conid{TmFalse}\mathrel{=}\Conid{TmFalse}}$\\
+${\Varid{subst}\;\Varid{j}\;\Varid{s}\;(\Conid{Rec}\;\Varid{l})\mathrel{=}}$\\
+${\hskip2.00em\relax(\Conid{Rec}\;(\Varid{map}\;(\lambda (\Varid{str},\Varid{t})\to (\Varid{str},(\Varid{subst}\;\Varid{j}\;\Varid{s}\;\Varid{t})))\;\Varid{l}))}$\\
+${\Varid{subst}\;\Varid{j}\;\Varid{s}\;(\Conid{Tpl}\;\Varid{l})\mathrel{=}}$\\
+${\hskip2.00em\relax(\Conid{Tpl}\;(\Varid{map}\;(\lambda \Varid{t}\to (\Varid{subst}\;\Varid{j}\;\Varid{s}\;\Varid{t}))\;\Varid{l}))}$\\
+${\Varid{subst}\;\Varid{j}\;\Varid{s}\;(\Conid{ProjRcd}\;\Varid{r}\;\Varid{str})\mathrel{=}}$\\
+${\hskip2.00em\relax(\Conid{ProjRcd}\;(\Varid{subst}\;\Varid{j}\;\Varid{s}\;\Varid{r})\;\Varid{str})}$\\
+${\Varid{subst}\;\Varid{j}\;\Varid{s}\;(\Conid{ProjTpl}\;\Varid{t}\;\Varid{i})\mathrel{=}}$\\
+${\hskip2.00em\relax(\Conid{ProjTpl}\;(\Varid{subst}\;\Varid{j}\;\Varid{s}\;\Varid{t})\;\Varid{i})}$
+\end{tabbing}
+\subsection{Call By Value Evaluation Function}
+
+The \ensuremath{\Varid{eval}_{<:}} function provides a standard definition of
+call-by-value evaluation following from TPL Chapter 5.  The function
+definition is split up into cases corresponding to the evaluation
+rules.  Note that only \ensuremath{\Conid{AppN}} and \ensuremath{\Conid{AppV}} forms can be
+evaluated.  \ensuremath{\Conid{Lambda}} forms are values and \ensuremath{\Conid{Var}} forms
+are not closed.  Although passing a context is allowed in this
+function, in this project we are concerned only with close terms.
+Thus, the context can be safely ignored in all evaluation cases.
+
+The form of the evaluation function is a mapping from \ensuremath{\Varid{\Gamma}} and
+\ensuremath{\Conid{Term}} to another \ensuremath{\Conid{Term}}:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{expr}\mathbin{::}\Conid{Term}\to \Conid{Term}}$\\
+${\Varid{expr}\;(\Conid{Lambda}\;\Varid{ty}\;\Varid{t})\mathrel{=}\Varid{t}}$\\
+${}$\\
+${\Varid{proj}\mathbin{::}[\mskip1.5mu (\Conid{String},\Conid{Term})\mskip1.5mu]\to \Conid{String}\to \Conid{Retval}\;\Conid{Term}}$\\
+${\Varid{proj}\;[\mskip1.5mu \mskip1.5mu]\;\anonymous \mathrel{=}\Varid{fail}\;\text{\tt \char34 Evaluation~Error~-~Field~not~defined\char34}}$\\
+${\Varid{proj}\;((\Varid{s}_1,\Varid{v})\mathbin{:}\Varid{l})\;\Varid{s}_2\mathrel{=}\mathbf{if}\;\Varid{s}_1\equiv \Varid{s}_2}$\\
+${\hskip11.00em\relax\mathbf{then}\;\Varid{return}\;\Varid{v}}$\\
+${\hskip11.00em\relax\mathbf{else}\;(\Varid{proj}\;\Varid{l}\;\Varid{s}_2)}$
+\end{tabbing}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{eval}_{<:}\mathbin{::}\Conid{Term}\to \Conid{Retval}\;\Conid{Term}}$\\
+${}$\\
+${\Varid{eval}_{<:}\;\Conid{TmTrue}\mathrel{=}\Varid{return}\;\Conid{TmTrue}}$\\
+${\Varid{eval}_{<:}\;\Conid{TmFalse}\mathrel{=}\Varid{return}\;\Conid{TmFalse}}$\\
+${\Varid{eval}_{<:}\;(\Conid{Rec}\;\Varid{x})\mathrel{=}\Varid{return}\;(\Conid{Rec}\;\Varid{x})}$\\
+${\Varid{eval}_{<:}\;(\Conid{Tpl}\;\Varid{x})\mathrel{=}\Varid{return}\;(\Conid{Tpl}\;\Varid{x})}$\\
+${}$\\
+${\Varid{eval}_{<:}\;(\Conid{AppV}\;\Varid{t}_1\;\Varid{t}_2)\mathrel{=}}$\\
+${\hskip2.00em\relax\mathbf{do}\;\Varid{nt1}\leftarrow \Varid{eval}_{<:}\;\Varid{t}_1}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{nt2}\leftarrow \Varid{eval}_{<:}\;\Varid{t}_2}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{eval}_{<:}\;(\Varid{shift}\;(\Varid{subst}\;\mathrm{0}\;(\Varid{shift}\;\Varid{nt2}\;\mathrm{0}\;\mathrm{1})\;(\Varid{expr}\;\Varid{nt1}))\;\mathrm{0}\;(\mathbin{-}\mathrm{1}))}$\\
+${}$\\
+${\Varid{eval}_{<:}\;(\Conid{AppN}\;\Varid{t}_1\;\Varid{t}_2)\mathrel{=}}$\\
+${\hskip2.00em\relax\mathbf{do}\;\Varid{nt1}\leftarrow \Varid{eval}_{<:}\;\Varid{t}_1}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{eval}_{<:}\;(\Varid{shift}\;(\Varid{subst}\;\mathrm{0}\;(\Varid{shift}\;\Varid{t}_2\;\mathrm{0}\;\mathrm{1})\;(\Varid{expr}\;\Varid{nt1}))\;\mathrm{0}\;(\mathbin{-}\mathrm{1}))}$\\
+${}$\\
+${\Varid{eval}_{<:}\;(\Conid{Lambda}\;\Varid{ty1}\;\Varid{t}_1)\mathrel{=}\Varid{return}\;(\Conid{Lambda}\;\Varid{ty1}\;\Varid{t}_1)}$\\
+${}$\\
+${\Varid{eval}_{<:}\;(\Conid{Var}\;\Varid{t}_1)\mathrel{=}\Varid{fail}\;\text{\tt \char34 Evaluation~Error~-~Cannot~evaluate~free~variable\char34}}$\\
+${}$\\
+${\Varid{eval}_{<:}\;(\Conid{If}\;\Conid{TmTrue}\;\Varid{t}_2\;\Varid{t}_3)\mathrel{=}}$\\
+${\hskip2.00em\relax\mathbf{do}\;\Varid{tr}\leftarrow \Varid{eval}_{<:}\;\Varid{t}_2}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{return}\;\Varid{tr}}$\\
+${\Varid{eval}_{<:}\;(\Conid{If}\;\Conid{TmFalse}\;\Varid{t}_2\;\Varid{t}_3)\mathrel{=}}$\\
+${\hskip2.00em\relax\mathbf{do}\;\Varid{fl}\leftarrow \Varid{eval}_{<:}\;\Varid{t}_3}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{return}\;\Varid{fl}}$\\
+${\Varid{eval}_{<:}\;(\Conid{If}\;\Varid{t}_1\;\Varid{t}_2\;\Varid{t}_3)\mathrel{=}}$\\
+${\hskip2.00em\relax\mathbf{do}\;\Varid{cond}\leftarrow (\Varid{eval}_{<:}\;\Varid{t}_1)}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{eval}_{<:}\;(\Conid{If}\;\Varid{cond}\;\Varid{t}_2\;\Varid{t}_3)}$\\
+${\Varid{eval}_{<:}\;(\Conid{ProjRcd}\;(\Conid{Rec}\;\Varid{r})\;\Varid{l})\mathrel{=}(\Varid{proj}\;\Varid{r}\;\Varid{l})}$\\
+${\Varid{eval}_{<:}\;(\Conid{ProjTpl}\;(\Conid{Tpl}\;\Varid{t})\;\Varid{i})\mathrel{=}\Varid{return}\;(\Varid{t}\mathbin{!!}\Varid{i})}$
+\end{tabbing}
+\section{Type Checking and Evaluation}
+
+The objective of type checking is to statically predict the runtime
+behavior of a code element with respect to the kinds of values
+produced and expected.  Specifically, does a program element always
+product the kind of value espected?  The \texttt{typeof} function
+provides a capability for generating the type associated with a
+$\lambda_{<:}$ term.  If such a type exists, then the term is
+well-typed and should be executed.
+
+To combine type checking and evaluation is a simple matter of: (i)
+determining the type of a term; and (ii) executing the term if the
+type exists.  This process can be specified using the following
+template:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{interpTemplate}\mathbin{::}(\Conid{Term}\to \Conid{Retval}\;\Varid{T})\to }$\\
+${\phantom{\Varid{interpTemplate}\mathbin{::}\mbox{}}(\Conid{Term}\to \Conid{Retval}\;\Conid{Term})\to }$\\
+${\phantom{\Varid{interpTemplate}\mathbin{::}\mbox{}}\Conid{Term}\to }$\\
+${\phantom{\Varid{interpTemplate}\mathbin{::}\mbox{}}\Conid{Retval}\;\Conid{Term}}$\\
+${\Varid{interpTemplate}\;\Varid{typeof}_{<:}\;\Varid{eval}_{<:}\;\Varid{term}\mathrel{=}}$\\
+${\hskip2.00em\relax\mathbf{do}\;\Varid{termtype}\leftarrow (\Varid{typeof}_{<:}\;\Varid{term})}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{term'}\leftarrow (\Varid{eval}_{<:}\;\Varid{term})}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\Varid{return}\;\Varid{term'}}$\\
+${}$\\
+${\Varid{evalTemplateStar}\mathbin{::}(\Conid{Term}\to \Conid{Retval}\;\Conid{Term})\to \Conid{Term}\to \Conid{Retval}\;\Conid{Term}}$\\
+${\Varid{evalTemplateStar}\;\Varid{eval}_{<:}\;\Varid{term}\mathrel{=}}$\\
+${\hskip2.00em\relax\mathbf{do}\;\Varid{term'}\leftarrow (\Varid{eval}_{<:}\;\Varid{term})}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}};\mathbf{if}\;(\Varid{value}\;\Varid{term'})}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mathbf{if}\;\mbox{}}\mathbf{then}\;\Varid{return}\;\Varid{term'}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{do}\;\mbox{}}\phantom{;\mathbf{if}\;\mbox{}}\mathbf{else}\;(\Varid{evalTemplateStar}\;\Varid{eval}_{<:})\;\Varid{term'}}$
+\end{tabbing}
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{interpret}\mathbin{::}\Conid{Term}\to \Conid{Retval}\;\Conid{Term}}$\\
+${\Varid{interpret}\mathrel{=}\Varid{interpTemplate}\;(\Varid{typeof}_{<:}\;[\mskip1.5mu \mskip1.5mu])\;\Varid{eval}_{<:}}$
+\end{tabbing}
+\section{Testing and Evaluation}
+
+To test the interpreter, some functions from the book are provided
+here.  They include the identity combinator, Church Boolean funtions,
+some Church Numbers and the successor function defined for Church
+numbers.
+
+Note that with the introduction of types, all parameters must have
+associated type annotations.  Although significant static checking
+results, the flexibility of these functions is diminished.
+Specifically, for the \texttt{ident} combinator a new combinator must
+be written for each type.  No polymorphism exists and the type system
+is strict, so there is no way to reuse the \texttt{ident} combinator
+definition.  Such strictness is common in older programming languages,
+but new polymorphism implementations render the approach obscolete.
+
+\subsection{Identity Combinator}
+
+Redefine the \ensuremath{\Varid{ident}} combinator to operate over \ensuremath{\Conid{Top}} to take
+advantage of subtyping.  Evaluating the \ensuremath{(\Conid{App}\;\Varid{indent}\;\Varid{t})} combinator on
+term defined in $\lambda_{<:}$ should result in \ensuremath{\Varid{t}} regardless of its type:
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{ident}\mathbin{::}\Conid{Term}}$\\
+${\Varid{ident}\mathrel{=}(\Conid{Lambda}\;\Conid{TyTop}\;(\Conid{Var}\;\mathrm{0}))}$\\
+${}$\\
+${\Varid{testIdent}\mathbin{::}[\mskip1.5mu \Conid{Retval}\;\Conid{Term}\mskip1.5mu]}$\\
+${\Varid{testIdent}\mathrel{=}}$\\
+${\hskip2.00em\relax\Varid{map}\;\Varid{interpret}\;[\mskip1.5mu \Varid{ident},}$\\
+${\hskip2.00em\relax\phantom{\Varid{map}\;\Varid{interpret}\;[\mskip1.5mu \mbox{}}(\Conid{Rec}\;[\mskip1.5mu (\text{\tt \char34 1\char34},\Conid{TmTrue}),(\text{\tt \char34 2\char34},\Conid{TmFalse}),(\text{\tt \char34 3\char34},\Varid{ident})\mskip1.5mu]),}$\\
+${\hskip2.00em\relax\phantom{\Varid{map}\;\Varid{interpret}\;[\mskip1.5mu \mbox{}}(\Conid{ProjRcd}\;(\Conid{Rec}\;[\mskip1.5mu (\text{\tt \char34 1\char34},\Conid{TmTrue}),(\text{\tt \char34 2\char34},\Conid{TmFalse}),(\text{\tt \char34 3\char34},\Varid{ident})\mskip1.5mu])\;\text{\tt \char34 1\char34})\mskip1.5mu]}$\\
+${}$\\
+${\Varid{testRecord}\mathbin{::}[\mskip1.5mu \Conid{Retval}\;\Conid{Term}\mskip1.5mu]}$\\
+${\Varid{testRecord}\mathrel{=}}$\\
+${\hskip2.00em\relax\mathbf{let}\;\Varid{r}\mathrel{=}(\Conid{Rec}\;[\mskip1.5mu (\text{\tt \char34 1\char34},\Conid{TmTrue}),(\text{\tt \char34 2\char34},\Conid{TmFalse}),(\text{\tt \char34 3\char34},\Varid{ident})\mskip1.5mu])\;\mathbf{in}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{let}\;\mbox{}}\Varid{map}\;\Varid{interpret}\;}$\\
+${\hskip2.00em\relax\phantom{\mathbf{let}\;\mbox{}}\phantom{\Varid{map}\;\mbox{}}[\mskip1.5mu (\Conid{ProjRcd}\;\Varid{r}\;\text{\tt \char34 1\char34}),}$\\
+${\hskip2.00em\relax\phantom{\mathbf{let}\;\mbox{}}\phantom{\Varid{map}\;\mbox{}}\phantom{[\mskip1.5mu \mbox{}}(\Conid{ProjRcd}\;\Varid{r}\;\text{\tt \char34 3\char34}),}$\\
+${\hskip2.00em\relax\phantom{\mathbf{let}\;\mbox{}}\phantom{\Varid{map}\;\mbox{}}\phantom{[\mskip1.5mu \mbox{}}(\Conid{ProjRcd}\;\Varid{r}\;\text{\tt \char34 4\char34}),}$\\
+${\hskip2.00em\relax\phantom{\mathbf{let}\;\mbox{}}\phantom{\Varid{map}\;\mbox{}}\phantom{[\mskip1.5mu \mbox{}}(\Conid{AppV}\;(\Conid{ProjRcd}\;\Varid{r}\;\text{\tt \char34 3\char34})\;\Varid{r})\mskip1.5mu]}$\\
+${}$\\
+${\Varid{testRecSubtype}\mathbin{::}[\mskip1.5mu \Conid{Retval}\;\Conid{Term}\mskip1.5mu]}$\\
+${\Varid{testRecSubtype}\mathrel{=}}$\\
+${\hskip2.00em\relax\mathbf{let}\;\Varid{l}\mathrel{=}(\Conid{Lambda}\;(\Conid{TyRec}\;[\mskip1.5mu (\text{\tt \char34 1\char34},\Conid{TyBool}),(\text{\tt \char34 2\char34},\Conid{TyBool}),(\text{\tt \char34 3\char34},\Conid{TyBool})\mskip1.5mu])}$\\
+${\hskip2.00em\relax\phantom{\mathbf{let}\;\Varid{l}\mathrel{=}(\mbox{}}(\Conid{ProjRcd}\;(\Conid{Var}\;\mathrm{0})\;\text{\tt \char34 2\char34}))\;\mathbf{in}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{let}\;\mbox{}}\Varid{map}\;\Varid{interpret}\;}$\\
+${\hskip2.00em\relax\phantom{\mathbf{let}\;\mbox{}}\hskip4.00em\relax[\mskip1.5mu (\Conid{AppV}\;\Varid{l}\;(\Conid{Rec}\;[\mskip1.5mu (\text{\tt \char34 1\char34},\Conid{TmTrue}),(\text{\tt \char34 2\char34},\Conid{TmFalse}),(\text{\tt \char34 3\char34},\Conid{TmTrue})\mskip1.5mu])),}$\\
+${\hskip2.00em\relax\phantom{\mathbf{let}\;\mbox{}}\hskip4.00em\relax\phantom{[\mskip1.5mu \mbox{}}(\Conid{AppV}\;\Varid{l}\;(\Conid{Rec}\;[\mskip1.5mu (\text{\tt \char34 1\char34},\Conid{TmTrue}),(\text{\tt \char34 2\char34},\Conid{TmFalse})\mskip1.5mu])),}$\\
+${\hskip2.00em\relax\phantom{\mathbf{let}\;\mbox{}}\hskip4.00em\relax\phantom{[\mskip1.5mu \mbox{}}(\Conid{AppV}\;\Varid{l}\;(\Conid{Rec}\;[\mskip1.5mu (\text{\tt \char34 2\char34},\Conid{TmFalse}),(\text{\tt \char34 3\char34},\Conid{TmTrue})\mskip1.5mu])),}$\\
+${\hskip2.00em\relax\phantom{\mathbf{let}\;\mbox{}}\hskip4.00em\relax\phantom{[\mskip1.5mu \mbox{}}(\Conid{AppV}\;\Varid{l}\;(\Conid{Rec}\;[\mskip1.5mu (\text{\tt \char34 1\char34},\Conid{TmTrue}),(\text{\tt \char34 4\char34},\Conid{TmFalse}),(\text{\tt \char34 3\char34},\Conid{TmTrue})\mskip1.5mu]))\mskip1.5mu]}$\\
+${}$\\
+${\Varid{testTuple}\mathbin{::}[\mskip1.5mu \Conid{Retval}\;\Conid{Term}\mskip1.5mu]}$\\
+${\Varid{testTuple}\mathrel{=}}$\\
+${\hskip2.00em\relax\mathbf{let}\;\Varid{r}\mathrel{=}(\Conid{Tpl}\;[\mskip1.5mu \Conid{TmTrue},\Conid{TmFalse},\Varid{ident}\mskip1.5mu])\;\mathbf{in}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{let}\;\mbox{}}\Varid{map}\;\Varid{interpret}\;}$\\
+${\hskip2.00em\relax\phantom{\mathbf{let}\;\mbox{}}\phantom{\Varid{map}\;\mbox{}}[\mskip1.5mu (\Conid{ProjTpl}\;\Varid{r}\;\mathrm{0}),}$\\
+${\hskip2.00em\relax\phantom{\mathbf{let}\;\mbox{}}\phantom{\Varid{map}\;\mbox{}}\phantom{[\mskip1.5mu \mbox{}}(\Conid{ProjTpl}\;\Varid{r}\;\mathrm{2}),}$\\
+${\hskip2.00em\relax\phantom{\mathbf{let}\;\mbox{}}\phantom{\Varid{map}\;\mbox{}}\phantom{[\mskip1.5mu \mbox{}}(\Conid{ProjTpl}\;\Varid{r}\;\mathrm{3}),}$\\
+${\hskip2.00em\relax\phantom{\mathbf{let}\;\mbox{}}\phantom{\Varid{map}\;\mbox{}}\phantom{[\mskip1.5mu \mbox{}}(\Conid{AppV}\;(\Conid{ProjTpl}\;\Varid{r}\;\mathrm{2})\;\Varid{r})\mskip1.5mu]}$\\
+${}$\\
+${\Varid{testTupleSubtype}\mathbin{::}[\mskip1.5mu \Conid{Retval}\;\Conid{Term}\mskip1.5mu]}$\\
+${\Varid{testTupleSubtype}\mathrel{=}}$\\
+${\hskip2.00em\relax\mathbf{let}\;\Varid{l}\mathrel{=}(\Conid{Lambda}\;(\Conid{TyTpl}\;[\mskip1.5mu \Conid{TyBool},\Conid{TyBool},\Conid{TyBool}\mskip1.5mu])}$\\
+${\hskip2.00em\relax\phantom{\mathbf{let}\;\Varid{l}\mathrel{=}(\mbox{}}(\Conid{ProjTpl}\;(\Conid{Var}\;\mathrm{0})\;\mathrm{1}))\;\mathbf{in}}$\\
+${\hskip2.00em\relax\phantom{\mathbf{let}\;\mbox{}}\Varid{map}\;\Varid{interpret}\;}$\\
+${\hskip2.00em\relax\phantom{\mathbf{let}\;\mbox{}}\hskip4.00em\relax[\mskip1.5mu (\Conid{AppV}\;\Varid{l}\;(\Conid{Tpl}\;[\mskip1.5mu \Conid{TmTrue},\Conid{TmFalse},\Conid{TmTrue}\mskip1.5mu])),}$\\
+${\hskip2.00em\relax\phantom{\mathbf{let}\;\mbox{}}\hskip4.00em\relax\phantom{[\mskip1.5mu \mbox{}}(\Conid{AppV}\;\Varid{l}\;(\Conid{Tpl}\;[\mskip1.5mu \Conid{TmTrue},\Conid{TmFalse}\mskip1.5mu])),}$\\
+${\hskip2.00em\relax\phantom{\mathbf{let}\;\mbox{}}\hskip4.00em\relax\phantom{[\mskip1.5mu \mbox{}}(\Conid{AppV}\;\Varid{l}\;(\Conid{Tpl}\;[\mskip1.5mu \Conid{TmFalse},\Conid{TmTrue}\mskip1.5mu])),}$\\
+${\hskip2.00em\relax\phantom{\mathbf{let}\;\mbox{}}\hskip4.00em\relax\phantom{[\mskip1.5mu \mbox{}}(\Conid{AppV}\;\Varid{l}\;(\Conid{Tpl}\;[\mskip1.5mu \Conid{TmTrue},\Varid{ident},\Conid{TmTrue}\mskip1.5mu]))\mskip1.5mu]}$
+\end{tabbing}
+\subsection{Church Boolean Definitions}
+
+The boolean combinators must have typed parameters.  Real booleans are
+chosen for simplicity.  Church Booleans don't make a great deal of
+sense in a strongly typed language like this.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{tru}\mathbin{::}\Conid{Term}}$\\
+${\Varid{tru}\mathrel{=}(\Conid{Lambda}\;\Conid{TyTop}\;(\Conid{Lambda}\;\Conid{TyTop}\;(\Conid{Var}\;\mathrm{1})))}$\\
+${\Varid{fls}\mathbin{::}\Conid{Term}}$\\
+${\Varid{fls}\mathrel{=}(\Conid{Lambda}\;\Conid{TyTop}\;(\Conid{Lambda}\;\Conid{TyTop}\;(\Conid{Var}\;\mathrm{0})))}$\\
+${}$\\
+${\Varid{testTru}\mathbin{::}\Conid{Retval}\;\Conid{Term}}$\\
+${\Varid{testTru}\mathrel{=}\Varid{interpret}\;(\Conid{AppV}\;(\Conid{AppV}\;\Varid{tru}\;\Varid{ident})\;\Varid{fls})}$\\
+${}$\\
+${\Varid{testFls}\mathbin{::}\Conid{Retval}\;\Conid{Term}}$\\
+${\Varid{testFls}\mathrel{=}\Varid{interpret}\;(\Conid{AppV}\;(\Conid{AppV}\;\Varid{fls}\;\Varid{fls})\;\Varid{ident})}$
+\end{tabbing}
+\subsection{Church Number Definitions}
+
+The number combinators must have typed parameters.  Real booleans are
+chosen for simplicity.  In a word, these definitions are not appropriate
+anymore, but they are retained for testing.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{c}_0\mathbin{::}\Conid{Term}}$\\
+${\Varid{c}_0\mathrel{=}(\Conid{Lambda}\;\Conid{TyBool}\;(\Conid{Lambda}\;\Conid{TyBool}\;(\Conid{Var}\;\mathrm{0})))}$\\
+${}$\\
+${\Varid{c}_1\mathbin{::}\Conid{Term}}$\\
+${\Varid{c}_1\mathrel{=}(\Conid{Lambda}\;\Conid{TyBool}\;(\Conid{Lambda}\;\Conid{TyBool}\;(\Conid{AppV}\;(\Conid{Var}\;\mathrm{1})\;(\Conid{Var}\;\mathrm{0}))))}$\\
+${}$\\
+${\Varid{c}_2\mathbin{::}\Conid{Term}}$\\
+${\Varid{c}_2\mathrel{=}(\Conid{Lambda}\;\Conid{TyBool}\;(\Conid{Lambda}\;\Conid{TyBool}\;(\Conid{AppV}\;(\Conid{Var}\;\mathrm{1})\;(\Conid{AppV}\;(\Conid{Var}\;\mathrm{1})\;(\Conid{Var}\;\mathrm{0})))))}$\\
+${}$\\
+${\Varid{scc}\mathbin{::}\Conid{Term}}$\\
+${\Varid{scc}\mathrel{=}(\Conid{Lambda}\;\Conid{TyBool}}$\\
+${\phantom{\Varid{scc}\mathrel{=}(\mbox{}}(\Conid{Lambda}\;\Conid{TyBool}}$\\
+${\phantom{\Varid{scc}\mathrel{=}(\mbox{}}\phantom{(\mbox{}}(\Conid{Lambda}\;\Conid{TyBool}\;(\Conid{AppV}\;(\Conid{Var}\;\mathrm{1})}$\\
+${\phantom{\Varid{scc}\mathrel{=}(\mbox{}}\phantom{(\mbox{}}\phantom{(\Conid{Lambda}\;\Conid{TyBool}\;(\mbox{}}(\Conid{AppV}\;(\Conid{Var}\;\mathrm{2})}$\\
+${\phantom{\Varid{scc}\mathrel{=}(\mbox{}}\phantom{(\mbox{}}\phantom{(\Conid{Lambda}\;\Conid{TyBool}\;(\mbox{}}\phantom{(\mbox{}}(\Conid{AppV}\;(\Conid{Var}\;\mathrm{1})\;(\Conid{Var}\;\mathrm{0})))))))}$
+\end{tabbing}
+\subsection{Omega}
+
+With the introduction of types, the omega combinator must type its
+parameter.  Boolean is selected here for the sake of simplicity, but
+other types could be used.
+
+\begin{tabbing}
+\qquad\=\hspace{\lwidth}\=\hspace{\cwidth}\=\+\kill
+${\Varid{\Omega}\mathbin{::}\Conid{Term}}$\\
+${\Varid{\Omega}\mathrel{=}(\Conid{Lambda}\;\Conid{TyTop}\;(\Conid{AppV}\;(\Conid{Var}\;\mathrm{0})\;(\Conid{Var}\;\mathrm{0})))}$
+\end{tabbing}
+\section{Notes}
+
+The evaluation function is built to handle both call-by-value and
+call-by-name function application.  This may end up causing problems
+if the arguments to record and tuple references are treated as types
+in the language rather than Haskell string and integer types.
+
+Are record and tuple projections too aggressive for call-by-name
+application?  They are not true functions in the langauge due to the
+types of their reference values.
+
+\bibliography{prog-langs}
+
+\end{document}
