@@ -1,4 +1,4 @@
 interpreters
 ============
 
-Experiments wring interpreters with Haskell.
+Experiments writing interpreters with Haskell.
